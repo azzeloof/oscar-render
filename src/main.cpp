@@ -7,10 +7,19 @@
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
+#include <deque>
 
 #ifndef M_PI
-#define M_PI 3.1415926
+#define M_PI 3.14159265359
 #endif
+
+float dist(sf::Vertex A, sf::Vertex B) {
+    return std::sqrt(std::pow((A.position.x - B.position.x),2) + std::pow((A.position.y - B.position.y),2));
+}
+
+float dist(int x1, int y1, int x2, int y2) {
+    return std::sqrt(std::pow((x1 - x2), 2) + std::pow((y1 - y2), 2));
+}
 
 /**
  * @class Oscilloscope
@@ -43,10 +52,19 @@ public:
     float getThickness() const {
         return n_layers;
     }
+    void setPersistenceFrames(unsigned int n) {
+        maxPersistentFrames = n;
+    }
+    unsigned int getPersistenceFrames() const {
+        return maxPersistentFrames;
+    }
+    void setPersistenceStrength(unsigned int n) {
+        persistenceStrength = n;
+    }
+    unsigned int getPersistenceStrength() const {
+        return persistenceStrength;
+    }
 
-float dist(sf::Vertex A, sf::Vertex B) {
-    return std::sqrt(std::pow((A.position.x - B.position.x),2) + std::pow((A.position.y - B.position.y),2));
-}
 
 private:
     virtual bool onProcessSamples(const std::int16_t* samples, std::size_t sampleCount) override {
@@ -63,35 +81,17 @@ private:
 
             float x_pos = m_center.x + x_sample * m_radius;
             float y_pos = m_center.y + y_sample * m_radius;
+            float distance = dist(x_pos, y_pos, prev_x_pos, prev_y_pos);
             
             sf::Vertex vertex;
             vertex.position = {x_pos, y_pos};
-            //if (i < 1000) {
-            vertex.color = sf::Color::Green;
-            //} else {
-            //int pt = i / 2;
-            //int nPt = sampleCount / 2;
-            //std::cout << i*255/sampleCount << "\n";
-            //sf::Color vc(i * 255 / sampleCount, 0, 0, 255);
-            //    vertex.color = sf::Color::Blue;
-            //}
-            //vertex.color = vc;
+            //sf::Color vc(0, 255, 0, std::max(0.f,(1.f-distance/50))*255);
+            sf::Color vc(0, 255, 0, 255);
+            vertex.color = vc;
             m_vertices.append(vertex);
             prev_x_pos = x_pos;
             prev_y_pos = y_pos;
         }
-        /*
-        float max_dist = 0.f;
-        for (int i=0; i<m_vertices.getVertexCount()-2; i++) {
-            float d = dist(m_vertices[i], m_vertices[i+1]);
-            max_dist = (max_dist < d) ? d : max_dist;
-        }
-        for (int i=0; i<m_vertices.getVertexCount()-1; i++) {
-            uint8_t alpha = (i+1 < sampleCount) ? (max_dist-dist(m_vertices[i], m_vertices[i+1]))/max_dist: 0;
-            sf::Color vc(0, 255, 0, alpha);
-            m_vertices[i].color = vc;
-        }
-        */
         return true;
     }
 
@@ -116,25 +116,26 @@ private:
                 target.draw(m_vertices, offsetStates);
             }
         }
-        
-
     }
 
-    sf::Vector2f m_center;
     float m_radius = 0.f;
-    float m_thickness = 1.f;
-    int n_layers = 10;
-
+    sf::Vector2f m_center;
     sf::VertexArray m_vertices;
     mutable std::mutex m_mutex;
     std::vector<std::string> m_availableDevices;
+
+    // Parameters
+    float m_thickness = 0.5f;
+    unsigned int n_layers = 3;
+    unsigned int maxPersistentFrames = 20;
+    unsigned int persistenceStrength = 200;
 };
 
 
 int main() {
     unsigned int width = 800;
     unsigned int height = 600;
-    // ---- 1. Device Selection ----
+    // ---- Device Selection ----
     auto availableDevices = sf::SoundRecorder::getAvailableDevices();
     if (availableDevices.empty()) { /* ... */ return -1; }
     std::cout << "Available audio devices:" << std::endl;
@@ -145,7 +146,7 @@ int main() {
     if (deviceIndex < 0 || static_cast<size_t>(deviceIndex) >= availableDevices.size()) { /* ... */ return -1; }
     const std::string& selectedDevice = availableDevices[deviceIndex];
     
-    // ---- 2. Oscilloscope and Window Setup ----
+    // ---- Oscilloscope and Window Setup ----
     Oscilloscope oscilloscope;
     oscilloscope.setChannelCount(2);
     if (!oscilloscope.startRecording(selectedDevice)) { /* ... */ return -1; }
@@ -154,30 +155,23 @@ int main() {
     window.setFramerateLimit(60);
     oscilloscope.updateView(window.getSize());
 
-    // ---- 3. Graphics Setup for Persistence Effect ----
     sf::RenderTexture traceTexture({width, height});
-    traceTexture.clear(sf::Color::Black);
-    sf::RectangleShape traceRect;
-    traceRect.setSize(sf::Vector2f(window.getSize()));
-    //int fadeAlpha = 10;
-    std::cout << "----------------------------------------------------" << std::endl;
-    //std::cout << "Persistence Alpha: " << fadeAlpha << " (Use +/- keys to change)" << std::endl;
-    std::cout << "Beam Offset/Thickness: " << oscilloscope.getThickness() << " (Use [ and ] keys to change)" << std::endl;
-    std::cout << "----------------------------------------------------" << std::endl;
+    sf::RenderTexture blurTexture({width, height});
+    sf::RenderTexture frameTexture({width, height});
+
+    std::deque<sf::Texture> persistentFrames;
     
-    // ---- Gaussian Blur Setup ----
+    //std::cout << "----------------------------------------------------" << std::endl;
+    //std::cout << "Persistence Alpha: " << fadeAlpha << " (Use +/- keys to change)" << std::endl;
+    //std::cout << "Beam Offset/Thickness: " << oscilloscope.getThickness() << " (Use [ and ] keys to change)" << std::endl;
+    //std::cout << "----------------------------------------------------" << std::endl;
+
     sf::Shader gaussianBlurShader;
     if (!gaussianBlurShader.loadFromFile("blur.frag", sf::Shader::Type::Fragment)) { /* ... */ return -1; }
     gaussianBlurShader.setUniform("texture", sf::Shader::CurrentTexture); // This will be the input texture to the shader
 
     float gaussianBlurSpread = 1.0f; // Controls how "wide" the blur is. 
     std::cout << "Gaussian Blur Spread: " << gaussianBlurSpread << " (Use PageUp/PageDown keys to change)" << std::endl;
-
-    sf::RenderTexture horizontalBlurTexture({width, height});
-    horizontalBlurTexture.clear(sf::Color::Transparent);
-
-    sf::RenderTexture blurRender({width, height});
-    blurRender.clear(sf::Color::Transparent); // Final blur output texture
 
     // ---- 4. Main Application Loop ----
     while (window.isOpen()) {
@@ -193,20 +187,13 @@ int main() {
                 height = sizeVec.y;
                 window.setView(sf::View(viewRect));
                 traceTexture = sf::RenderTexture(sizeVec);
-                horizontalBlurTexture = sf::RenderTexture(sizeVec);
-                blurRender = sf::RenderTexture(sizeVec);
-                traceRect.setSize(sf::Vector2f(sizeVec));
+                blurTexture = sf::RenderTexture(sizeVec);
+                frameTexture = sf::RenderTexture(sizeVec);
+                persistentFrames.clear();
                 oscilloscope.updateView(sizeVec);
             }
 
             if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                //if (keyPressed->code == sf::Keyboard::Key::Equal || keyPressed->code == sf::Keyboard::Key::Add) {
-                //    fadeAlpha = std::min(fadeAlpha + 1, 255);
-                //    std::cout << "Persistence Alpha: " << fadeAlpha << std::endl;
-                //} else if (keyPressed->code == sf::Keyboard::Key::Hyphen || keyPressed->code == sf::Keyboard::Key::Subtract) {
-                //    fadeAlpha = std::max(fadeAlpha - 1, 0);
-                //    std::cout << "Persistence Alpha: " << fadeAlpha << std::endl;
-                //} 
                 if (keyPressed->code == sf::Keyboard::Key::RBracket) {
                     oscilloscope.setThickness(oscilloscope.getThickness() + 1);
                     std::cout << "Layers: " << oscilloscope.getThickness() << std::endl;
@@ -223,35 +210,61 @@ int main() {
             }
         }
 
-
-        // ---- 5. Drawing Logic ----
-        traceRect.setFillColor(sf::Color(0, 0, 0, 255));
-        traceTexture.draw(traceRect);
+        traceTexture.clear(sf::Color::Transparent);
         traceTexture.draw(oscilloscope);
         traceTexture.display();
 
-        window.clear();
-
         // ---- Gaussian Blur Pass 1: Horizontal ----
+        gaussianBlurShader.setUniform("texture", traceTexture.getTexture());
         gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(traceTexture.getSize()));
         gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
         gaussianBlurShader.setUniform("blur_spread_px", gaussianBlurSpread);
         
-        horizontalBlurTexture.clear(sf::Color::Transparent);
-        horizontalBlurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
-        horizontalBlurTexture.display();
+        blurTexture.clear(sf::Color::Transparent);
+        blurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
+        blurTexture.display();
 
         // ---- Gaussian Blur Pass 2: Vertical ----
-        // texture_size is the same, blur_spread_px is the same
+        gaussianBlurShader.setUniform("texture", blurTexture.getTexture());
         gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(0.f, 1.f));
 
-        blurRender.clear(sf::Color::Transparent);
-        blurRender.draw(sf::Sprite(horizontalBlurTexture.getTexture()), &gaussianBlurShader);
-        blurRender.display();
+        frameTexture.clear(sf::Color::Transparent);
+        frameTexture.draw(sf::Sprite(blurTexture.getTexture()), &gaussianBlurShader);
+        frameTexture.display();
 
-        // ---- Draw the final blurred result to the window ----
-        window.draw(sf::Sprite(blurRender.getTexture()));
-        // DO NOT draw persistenceTexture directly to the window here, as it will cover the blur.
+        if (persistentFrames.size() >= oscilloscope.getPersistenceFrames()) {
+            persistentFrames.pop_back(); 
+        }
+        persistentFrames.push_front(frameTexture.getTexture()); // Add a copy
+
+        window.clear(sf::Color::Black);
+
+        for (size_t i = 0; i < persistentFrames.size(); ++i) {
+            sf::Sprite frameSprite(persistentFrames[i]);
+            
+            float alphaRatio = 1.0f;
+            if (persistentFrames.size() > 1) { // Avoid division by zero if only 1 frame
+                 alphaRatio = 1.0f - (static_cast<float>(i) / (persistentFrames.size() -1) );
+            }
+            std::uint8_t alpha = 0;
+            if (i == 0) { // Newest frame
+                alpha = 255;
+            } else {
+                float fadeFactor = static_cast<float>(oscilloscope.getPersistenceStrength()) / 255.f; // How much the oldest frame retains opacity
+                alpha = static_cast<std::uint8_t>(255.f * ( ( (oscilloscope.getPersistenceFrames() - 1.f - i) / (oscilloscope.getPersistenceFrames() -1.f) ) * (1.f - fadeFactor) + fadeFactor ) );
+                if (i == oscilloscope.getPersistenceFrames() -1) alpha = static_cast<std::uint8_t>(255.f * fadeFactor); // Oldest frame
+
+                // Simplified linear fade from 255 to ~0 for oldest
+                alpha = static_cast<std::uint8_t>(255.f * (1.f - static_cast<float>(i) / oscilloscope.getPersistenceFrames()));
+
+            }
+
+
+            frameSprite.setColor(sf::Color(0, 255, 0, alpha));
+            window.draw(frameSprite);
+        }
+        
+
         window.display();
     }
 
