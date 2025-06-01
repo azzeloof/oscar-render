@@ -9,124 +9,13 @@
 #include <cmath>
 #include <deque>
 #include <numbers>
-
+#include <asio.hpp>
+#include <osc++.hpp>
+#include "include/oscilloscope.hpp"
 
 float dist(int x1, int y1, int x2, int y2) {
     return std::hypot(x1 - x2, y1 - y2);
 }
-
-/**
- * @class Oscilloscope
- * @brief Captures and visualizes stereo audio data in real-time.
- */
-class Oscilloscope : public sf::SoundRecorder, public sf::Drawable {
-public:
-
-    void updateView(const sf::Vector2u& newSize) {
-        m_center.x = static_cast<float>(newSize.x) / 2.f;
-        m_center.y = static_cast<float>(newSize.y) / 2.f;
-        m_radius = std::min(static_cast<float>(newSize.x), static_cast<float>(newSize.y)) / 1.5f;
-    }
-
-    bool startRecording(const std::string& deviceName) {
-        if (!setDevice(deviceName)) {
-            return false;
-        }
-        return start();
-    }
-    
-    using sf::SoundRecorder::setChannelCount;
-
-    void setLayerCount(unsigned int n) {
-        n_layers = std::max(1u, n);
-    }
-
-    unsigned int getLayerCount() const {
-        return n_layers;
-    }
-
-    void setPersistenceFrames(unsigned int n) {
-        maxPersistentFrames = n;
-    }
-
-    unsigned int getPersistenceFrames() const {
-        return maxPersistentFrames;
-    }
-
-    void setPersistenceStrength(unsigned int n) {
-        persistenceStrength = n;
-    }
-
-    unsigned int getPersistenceStrength() const {
-        return persistenceStrength;
-    }
-
-
-private:
-    virtual bool onProcessSamples(const std::int16_t* samples, std::size_t sampleCount) override {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_vertices.clear();
-        m_vertices.setPrimitiveType(sf::PrimitiveType::LineStrip);
-        //float x_pos = 0;
-        //float y_pos = 0;
-        //float prev_x_pos = 0;
-        //float prev_y_pos = 0;
-        for (std::size_t i = 0; i < sampleCount; i += 2) {
-            float x_sample = samples[i] / 32768.f;
-            float y_sample = (i+1 < sampleCount) ? samples[i + 1] / 32768.f : 0.f;
-
-            float x_pos = m_center.x + x_sample * m_radius;
-            float y_pos = m_center.y + y_sample * m_radius;
-            //float distance = dist(x_pos, y_pos, prev_x_pos, prev_y_pos);
-            
-            sf::Vertex vertex;
-            vertex.position = {x_pos, y_pos};
-            //sf::Color vc(0, 255, 0, std::max(0.f,(1.f-distance/50))*255);
-            sf::Color vc(0, 255, 0, 255);
-            vertex.color = vc;
-            m_vertices.append(vertex);
-            //prev_x_pos = x_pos;
-            //prev_y_pos = y_pos;
-        }
-        return true;
-    }
-
-    virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (m_vertices.getVertexCount() == 0) {
-            return;
-        }
-
-        // Draw the main, centered line
-        target.draw(m_vertices, states);
-        
-        // Create copies with offsets for a thicker line
-        sf::RenderStates offsetStates = states;
-        static constexpr unsigned int nCirclePts = 8;
-        for (unsigned int i=0; i<n_layers; i++) {
-            for (unsigned int j=0; j<nCirclePts; j++) {
-                float angle = (2.f * static_cast<float>(M_PI) * j) / static_cast<float>(nCirclePts);
-                float offset = (i+1)*m_thickness;
-                offsetStates.transform = states.transform;
-                offsetStates.transform.translate(sf::Vector2f(offset*std::cos(angle), offset*std::sin(angle)));
-                target.draw(m_vertices, offsetStates);
-            }
-        }
-    }
-
-    float m_radius = 0.f;
-    sf::Vector2f m_center;
-    sf::VertexArray m_vertices;
-    mutable std::mutex m_mutex;
-    std::vector<std::string> m_availableDevices;
-
-    // Parameters
-    float m_thickness = 0.5f;
-    unsigned int n_layers = 3;
-    unsigned int maxPersistentFrames = 10;
-    unsigned int persistenceStrength = 0;
-};
-
 
 int main() {
     unsigned int width = 800;
@@ -157,16 +46,11 @@ int main() {
     oscilloscope.updateView(window.getSize());
 
     sf::RenderTexture traceTexture({width, height});
+    sf::RenderTexture compositeTexture({width, height});
     sf::RenderTexture blurTexture({width, height});
     sf::RenderTexture frameTexture({width, height});
-    sf::RenderTexture compositeTexture({width, height});
 
     std::deque<sf::Texture> persistentFrames;
-    
-    //std::cout << "----------------------------------------------------" << std::endl;
-    //std::cout << "Persistence Alpha: " << fadeAlpha << " (Use +/- keys to change)" << std::endl;
-    //std::cout << "Beam Offset/Thickness: " << oscilloscope.getLayerCount() << " (Use [ and ] keys to change)" << std::endl;
-    //std::cout << "----------------------------------------------------" << std::endl;
 
     sf::Shader gaussianBlurShader;
     if (!gaussianBlurShader.loadFromFile("blur.frag", sf::Shader::Type::Fragment)) {
