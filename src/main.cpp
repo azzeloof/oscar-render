@@ -9,15 +9,15 @@
 #include <cmath>
 #include <deque>
 #include <numbers>
-#include <asio.hpp>
-#include <osc++.hpp>
 #include "include/oscilloscope.hpp"
+
 
 float dist(int x1, int y1, int x2, int y2) {
     return std::hypot(x1 - x2, y1 - y2);
 }
 
 int main() {
+
     unsigned int width = 800;
     unsigned int height = 600;
     // Device Selection
