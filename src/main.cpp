@@ -9,14 +9,35 @@
 #include <cmath>
 #include <deque>
 #include <numbers>
+#include <thread>
+
 #include "include/oscilloscope.hpp"
-
-
-float dist(int x1, int y1, int x2, int y2) {
-    return std::hypot(x1 - x2, y1 - y2);
-}
+#include "include/osc.hpp"
+#include "include/helpers.hpp"
 
 int main() {
+    asio::io_context io_context;
+    OSCListener osc_listener_handler;
+
+    std::unique_ptr<AsioOscReceiver> osc_receiver;
+    try {
+        osc_receiver = std::make_unique<AsioOscReceiver>(io_context, osc_listener_handler);
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to initialize OSC receiver: " << e.what() << std::endl;
+        return -1; // Or handle error appropriately
+    }
+
+    // Create and run the Asio I/O context in a separate thread
+    std::thread asio_thread([&io_context]() {
+        try {
+            // Add a work guard to keep io_context::run() active
+            // as long as there are asynchronous operations (like our listener).
+            asio::executor_work_guard<asio::io_context::executor_type> work_guard = asio::make_work_guard(io_context);
+            io_context.run();
+        } catch (const std::exception& e) {
+            std::cerr << "Asio thread exception: " << e.what() << std::endl;
+        }
+    });
 
     unsigned int width = 800;
     unsigned int height = 600;
@@ -59,9 +80,6 @@ int main() {
     }
     gaussianBlurShader.setUniform("texture", sf::Shader::CurrentTexture); // This will be the input texture to the shader
 
-    float gaussianBlurSpread = 1.0f; // Controls how "wide" the blur is. 
-    std::cout << "Gaussian Blur Spread: " << gaussianBlurSpread << " (Use PageUp/PageDown keys to change)" << std::endl;
-
     // Main Application Loop
     while (window.isOpen()) {
         while (const auto event = window.pollEvent()) {
@@ -82,21 +100,43 @@ int main() {
                 persistentFrames.clear();
                 oscilloscope.updateView(sizeVec);
             }
+        }
 
-            if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
-                if (keyPressed->code == sf::Keyboard::Key::RBracket) {
-                    oscilloscope.setLayerCount(oscilloscope.getLayerCount() + 1);
-                    std::cout << "Layers: " << oscilloscope.getLayerCount() << std::endl;
-                } else if (keyPressed->code == sf::Keyboard::Key::LBracket) {
-                    oscilloscope.setLayerCount(oscilloscope.getLayerCount() - 1);
-                    std::cout << "Layers: " << oscilloscope.getLayerCount() << std::endl;
-                } else if (keyPressed->code == sf::Keyboard::Key::PageUp) {
-                    gaussianBlurSpread = std::min(gaussianBlurSpread + 0.2f, 10.f);
-                    std::cout << "Gaussian Blur Spread: " << gaussianBlurSpread << std::endl;
-                } else if (keyPressed->code == sf::Keyboard::Key::PageDown) {
-                    gaussianBlurSpread = std::max(gaussianBlurSpread - 0.2f, 0.2f);
-                    std::cout << "Gaussian Blur Spread: " << gaussianBlurSpread << std::endl;
-                }
+        if (auto val_opt = osc_listener_handler.getPendingLayerCount()) {
+            // val_opt is a std::optional<unsigned int>.
+            // Check if it contains a value (it will if an update was queued).
+            if (val_opt) {
+                oscilloscope.setLayerCount(*val_opt); // Use *val_opt to get the value
+                std::cout << "Main: Applied Layers set to: " << oscilloscope.getLayerCount() << std::endl;
+            }
+        }
+
+        if (auto val_opt = osc_listener_handler.getPendingPersistenceFrames()) {
+            if (val_opt) {
+                oscilloscope.setPersistenceFrames(*val_opt);
+                persistentFrames.clear();
+                std::cout << "Main: Applied Persistence Frames set to: " << oscilloscope.getPersistenceFrames() << std::endl;
+            }
+        }
+
+        if (auto val_opt = osc_listener_handler.getPendingPersistenceStrength()) {
+            if (val_opt) {
+                oscilloscope.setPersistenceStrength(*val_opt);
+                std::cout << "Main: Applied Persistence Strength set to: " << oscilloscope.getPersistenceStrength() << std::endl;
+            }
+        }
+
+        if (auto val_opt = osc_listener_handler.getPendingBlurSpread()) {
+            if (val_opt) {
+                oscilloscope.setBlurSpread(*val_opt);
+                std::cout << "Main: Applied Gaussian Blur Spread set to: " << oscilloscope.getBlurSpread() << std::endl;
+            }
+        }
+
+        if (auto val_opt = osc_listener_handler.getPendingScale()) {
+            if (val_opt) {
+                oscilloscope.setScale(*val_opt);
+                std::cout << "Main: Applied Scale set to: " << oscilloscope.getScale() << std::endl;
             }
         }
 
@@ -127,7 +167,7 @@ int main() {
                 alpha = static_cast<std::uint8_t>(255.f * ( ( (oscilloscope.getPersistenceFrames() - 1.f - i) / (oscilloscope.getPersistenceFrames() -1.f) ) * (1.f - fadeFactor) + fadeFactor ) );
                 if (i == oscilloscope.getPersistenceFrames() -1) alpha = static_cast<std::uint8_t>(255.f * fadeFactor); // Oldest frame
 
-                alpha = static_cast<std::uint8_t>(255.f * (1.f - static_cast<float>(i) / oscilloscope.getPersistenceFrames()));
+                alpha = static_cast<std::uint8_t>(255.f * (1.f - static_cast<float>(i) / static_cast<float>(oscilloscope.getPersistenceFrames())));
             }
 
             sf::Color oc = frameSprite.getColor();
@@ -139,7 +179,7 @@ int main() {
         gaussianBlurShader.setUniform("texture", compositeTexture.getTexture());
         gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(traceTexture.getSize()));
         gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
-        gaussianBlurShader.setUniform("blur_spread_px", gaussianBlurSpread);
+        gaussianBlurShader.setUniform("blur_spread_px", oscilloscope.getBlurSpread());
         
         blurTexture.clear(sf::Color::Transparent);
         blurTexture.draw(sf::Sprite(compositeTexture.getTexture()), &gaussianBlurShader);
@@ -159,5 +199,20 @@ int main() {
 
         window.display();
     }
+
+    std::cout << "Stopping OSC receiver and Asio context..." << std::endl;
+    if (osc_receiver) {
+        osc_receiver->stop(); // Request the OSC receiver to stop and close its socket
+    }
+    io_context.stop();    // Stop the io_context event loop (this will cause io_context.run() to return)
+
+    // Wait for the Asio thread to finish its work
+    if (asio_thread.joinable()) {
+        asio_thread.join();
+    }
+    std::cout << "Application finished." << std::endl;
+    
+    // oscilloscope.stop(); // sf::SoundRecorder::stop(), might be useful if you want to explicitly stop mic.
+
     return 0;
 }
