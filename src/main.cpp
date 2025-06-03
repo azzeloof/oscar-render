@@ -13,7 +13,6 @@
 
 #include "include/oscilloscope.hpp"
 #include "include/osc.hpp"
-#include "include/helpers.hpp"
 
 int main() {
     asio::io_context io_context;
@@ -102,12 +101,12 @@ int main() {
             }
         }
 
-        if (auto val_opt = osc_listener_handler.getPendingLayerCount()) {
+        if (auto val_opt = osc_listener_handler.getPendingTraceThickness()) {
             // val_opt is a std::optional<unsigned int>.
             // Check if it contains a value (it will if an update was queued).
             if (val_opt) {
-                oscilloscope.setLayerCount(*val_opt); // Use *val_opt to get the value
-                std::cout << "Main: Applied Layers set to: " << oscilloscope.getLayerCount() << std::endl;
+                oscilloscope.setTraceThickness(*val_opt); // Use *val_opt to get the value
+                std::cout << "Main: Applied Layers set to: " << oscilloscope.getTraceThickness() << std::endl;
             }
         }
 
@@ -163,10 +162,9 @@ int main() {
             if (i == 0) { 
                 alpha = 255;
             } else {
-                float fadeFactor = static_cast<float>(oscilloscope.getPersistenceStrength()) / 255.f; // How much the oldest frame retains opacity
-                alpha = static_cast<std::uint8_t>(255.f * ( ( (oscilloscope.getPersistenceFrames() - 1.f - i) / (oscilloscope.getPersistenceFrames() -1.f) ) * (1.f - fadeFactor) + fadeFactor ) );
-                if (i == oscilloscope.getPersistenceFrames() -1) alpha = static_cast<std::uint8_t>(255.f * fadeFactor); // Oldest frame
-
+                //float fadeFactor = static_cast<float>(oscilloscope.getPersistenceStrength()) / 255.f; // How much the oldest frame retains opacity
+                //alpha = static_cast<std::uint8_t>(255.f * ( ( (oscilloscope.getPersistenceFrames() - 1.f - i) / (oscilloscope.getPersistenceFrames() -1.f) ) * (1.f - fadeFactor) + fadeFactor ) );
+                //if (i == oscilloscope.getPersistenceFrames() -1) alpha = static_cast<std::uint8_t>(255.f * fadeFactor); // Oldest frame
                 alpha = static_cast<std::uint8_t>(255.f * (1.f - static_cast<float>(i) / static_cast<float>(oscilloscope.getPersistenceFrames())));
             }
 

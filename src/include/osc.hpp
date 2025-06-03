@@ -21,7 +21,7 @@ public:
     OSCListener();
     virtual ~OSCListener();
     
-    std::optional<unsigned int> getPendingLayerCount();
+    std::optional<unsigned int> getPendingTraceThickness();
     std::optional<unsigned int> getPendingPersistenceFrames();
     std::optional<unsigned int> getPendingPersistenceStrength();
     std::optional<float> getPendingBlurSpread();
@@ -34,7 +34,7 @@ private:
     std::mutex param_mutex_;
     // Store pending updates. std::optional indicates if a new value has been received.
     // If an optional contains a value, it means an OSC message for that parameter came in.
-    std::optional<unsigned int> layer_count_update_;
+    std::optional<unsigned int> trace_thickness_update_;
     std::optional<unsigned int> persistence_frames_update_;
     std::optional<unsigned int> persistence_strength_update_;
     std::optional<float> blur_spread_update_;

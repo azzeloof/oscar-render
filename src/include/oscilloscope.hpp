@@ -9,8 +9,12 @@
 #include <cstdint>
 #include <algorithm> // For std::min, std::max
 #include <cmath>
-#include "helpers.hpp"
 
+
+sf::Vector2f normalize(const sf::Vector2f& source);
+sf::Vector2f perpendicular(const sf::Vector2f& source);
+float distance(float x1, float y1, float x2, float y2);
+float distance(const sf::Vector2f& p1, const sf::Vector2f& p2);
 
 /**
  * @class Oscilloscope
@@ -19,10 +23,10 @@
 class Oscilloscope : public sf::SoundRecorder, public sf::Drawable {
 public:
     // Constructor (default is sufficient here)
-    // Oscilloscope(); 
+    Oscilloscope(); 
 
     // Destructor (default is sufficient here)
-    // virtual ~Oscilloscope();
+    // /virtual ~Oscilloscope();
 
     /**
      * @brief Updates the view parameters based on the new window/target size.
@@ -41,16 +45,16 @@ public:
     using sf::SoundRecorder::setChannelCount;
 
     /**
-     * @brief Sets the number of layers for the oscilloscope trace (visual thickness).
-     * @param n Number of layers. Minimum is 1.
+     * @brief Sets the trace thickness.
+     * @param thickness Trace width (px)
      */
-    void setLayerCount(unsigned int n);
+    void setTraceThickness(float thickness);
 
     /**
-     * @brief Gets the current number of layers for the oscilloscope trace.
-     * @return Number of layers.
+     * @brief Gets the current trace thickness.
+     * @return Thickness (px).
      */
-    unsigned int getLayerCount() const;
+    float getTraceThickness() const;
 
     /**
      * @brief Sets the maximum number of frames for persistence effect.
@@ -127,13 +131,16 @@ private:
 
     float prev_x_pos = 0.f;
     float prev_y_pos = 0.f;
-    sf::Vertex prev_final_vertex;
+    sf::Vertex m_last_processed_center_point;
+    sf::VertexArray m_triangle_strip;
+    bool m_has_valid_last_point;
+    //sf::Vertex prev_final_vertex;
 
     // Parameters
     float scale = 1.f;                      // Scale of the displayed trace
-    float m_thickness = 0.5f;               // Thickness offset for each layer.
+    float m_thickness = 1.f;                // Thickness of the trace.
     unsigned int n_layers = 3;              // Number of layers for visual thickness.
-    unsigned int maxPersistentFrames = 10;  // Max frames for persistence effect (used by main loop).
+    unsigned int maxPersistentFrames = 1;   // Max frames for persistence effect (used by main loop).
     unsigned int persistenceStrength = 0;   // Strength of oldest persistent frame (used by main loop).
     float gaussianBlurSpread = 0.f;         // Controls how "wide" the blur is.
 };

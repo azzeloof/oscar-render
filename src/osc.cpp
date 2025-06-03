@@ -16,14 +16,14 @@ void OSCListener::ProcessMessage(const osc::ReceivedMessage& m, const IpEndpoint
         std::lock_guard<std::mutex> lock(param_mutex_);
 
         // --- Parse specific OSC messages ---
-        if (std::strcmp(m.AddressPattern(), "/oscilloscope/layers") == 0) {
-            osc::int32 val; // oscpack uses osc::int32 for 'i' type tag
+        if (std::strcmp(m.AddressPattern(), "/oscilloscope/thickness") == 0) {
+            float val;
             args >> val >> osc::EndMessage; // Ensure all arguments are consumed
-            if (val >= 1) { // Basic validation for layer count
-                layer_count_update_ = static_cast<unsigned int>(val);
-                std::cout << "  OSC: Layers update queued: " << *layer_count_update_ << std::endl;
+            if (val >= 1.f) { 
+                trace_thickness_update_ = val;
+                std::cout << "  OSC: Trace thickness update queued: " << *trace_thickness_update_ << std::endl;
             } else {
-                std::cerr << "  OSC: Invalid layer count received: " << val << std::endl;
+                std::cerr << "  OSC: Invalid trace thickness received: " << val << std::endl;
             }
         } else if (std::strcmp(m.AddressPattern(), "/oscilloscope/persistence/frames") == 0) {
             osc::int32 val;
@@ -72,10 +72,10 @@ void OSCListener::ProcessMessage(const osc::ReceivedMessage& m, const IpEndpoint
 }
 
 // --- Implementations for the getter methods ---
-std::optional<unsigned int> OSCListener::getPendingLayerCount() {
+std::optional<unsigned int> OSCListener::getPendingTraceThickness() {
     std::lock_guard<std::mutex> lock(param_mutex_); // Lock before accessing
-    std::optional<unsigned int> val = layer_count_update_;
-    layer_count_update_.reset(); // Clear the value after it's been retrieved (consumed)
+    std::optional<unsigned int> val = trace_thickness_update_;
+    trace_thickness_update_.reset(); // Clear the value after it's been retrieved (consumed)
     return val;
 }
 

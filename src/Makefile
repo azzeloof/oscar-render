@@ -65,7 +65,7 @@ $(foreach s,$(OSCPACK_SRCS),$(info Source: $(s)))
 $(info --- End OSCPACK_SRCS ---)
 
 # --- Project Source Files ---
-SRCS = oscar/src/main.cpp oscar/src/oscilloscope.cpp oscar/src/osc.cpp oscar/src/helpers.cpp
+SRCS = oscar/src/main.cpp oscar/src/oscilloscope.cpp oscar/src/osc.cpp
 
 # Combine all source files
 ALL_SRCS = $(SRCS) $(OSCPACK_SRCS)
