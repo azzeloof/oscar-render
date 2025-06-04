@@ -142,7 +142,7 @@ int main() {
         traceTexture.clear(sf::Color::Transparent);
         traceTexture.draw(oscilloscope);
         traceTexture.display();
-
+        /*
         if (persistentFrames.size() >= oscilloscope.getPersistenceFrames()) {
             persistentFrames.pop_back(); 
         }
@@ -172,6 +172,7 @@ int main() {
             frameSprite.setColor(sf::Color(oc.r, oc.g, oc.b, alpha));
             compositeTexture.draw(frameSprite, sf::BlendAlpha);
         }
+        */
 
                 // Gaussian Blur Pass 1: Horizontal
         gaussianBlurShader.setUniform("texture", compositeTexture.getTexture());
@@ -180,7 +181,7 @@ int main() {
         gaussianBlurShader.setUniform("blur_spread_px", oscilloscope.getBlurSpread());
         
         blurTexture.clear(sf::Color::Transparent);
-        blurTexture.draw(sf::Sprite(compositeTexture.getTexture()), &gaussianBlurShader);
+        blurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
         blurTexture.display();
 
         // Gaussian Blur Pass 2: Vertical

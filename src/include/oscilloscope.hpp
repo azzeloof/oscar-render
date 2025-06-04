@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <algorithm> // For std::min, std::max
 #include <cmath>
+#include <deque>
+#include <iostream>
 
 
 sf::Vector2f normalize(const sf::Vector2f& source);
@@ -122,7 +124,7 @@ private:
 
     float m_radius = 0.f;               // Radius of the oscilloscope display area.
     sf::Vector2f m_center;              // Center point of the oscilloscope display area.
-    sf::VertexArray m_vertices;         // Vertex array for drawing the audio waveform.
+    //sf::VertexArray m_vertices;         // Vertex array for drawing the audio waveform.
     mutable std::mutex m_mutex;         // Mutex for thread-safe access to m_vertices.
     
     // This member was in the original class but not used by its methods.
@@ -131,8 +133,11 @@ private:
 
     float prev_x_pos = 0.f;
     float prev_y_pos = 0.f;
-    sf::Vertex m_last_processed_center_point;
+    sf::Vertex prev_vertex;
     sf::VertexArray m_triangle_strip;
+    std::deque<sf::Vertex> center_line_points;
+    std::deque<uint8_t> alpha_values;
+    uint16_t max_points = 20000;
     bool m_has_valid_last_point;
     //sf::Vertex prev_final_vertex;
 

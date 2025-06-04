@@ -22,8 +22,8 @@ float distance(float x1, float y1, float x2, float y2) {
 }
 
 Oscilloscope::Oscilloscope() : m_has_valid_last_point(false), m_thickness(1.f) {
-    m_last_processed_center_point.position = {0.f, 0.f};
-    m_last_processed_center_point.color = sf::Color::Transparent;
+    prev_vertex.position = {0.f, 0.f};
+    prev_vertex.color = sf::Color::Transparent;
 } 
 
 void Oscilloscope::updateView(const sf::Vector2u& newSize) {
@@ -87,18 +87,21 @@ bool Oscilloscope::onProcessSamples(const std::int16_t* samples, std::size_t sam
     //m_vertices.clear();
     //m_vertices.setPrimitiveType(sf::PrimitiveType::LineStrip);
     //m_vertices.append(prev_final_vertex);
-    std::vector<sf::Vertex> center_line_points;
+    //std::vector<sf::Vertex> center_line_points;
+    //if (m_has_valid_last_point) {
+    //    center_line_points.push_front(prev_vertex);
+    //}
+    //if (center_line_points.size() > max_points) {
+    //    center_line_points.pop_back();
+    //}
+    sf::Vector2f prev_xy;
     if (m_has_valid_last_point) {
-        center_line_points.push_back(m_last_processed_center_point);
-    }
-    sf::Vector2f last_screen_pos_for_color_calc;
-    if (m_has_valid_last_point) {
-        last_screen_pos_for_color_calc = m_last_processed_center_point.position;
+        prev_xy = prev_vertex.position;
     } else if (sampleCount > 0) {
         // For the very first point of the very first batch, base its color on a zero-distance.
         float x_sample0 = static_cast<float>(samples[0]) / 32768.f;
         float y_sample0 = (sampleCount > 1) ? static_cast<float>(samples[1]) / 32768.f : 0.f;
-        last_screen_pos_for_color_calc = {m_center.x + x_sample0 * m_radius * scale,
+        prev_xy = {m_center.x + x_sample0 * m_radius * scale,
                                           m_center.y + y_sample0 * m_radius * scale};
     } else {
         // No previous point and no new samples, clear strip and return.
@@ -113,25 +116,33 @@ bool Oscilloscope::onProcessSamples(const std::int16_t* samples, std::size_t sam
         }
 
         sf::Vector2f current_screen_pos(m_center.x + x_sample * m_radius * scale,
-                                        m_center.y + y_sample * m_radius * scale);
+                                        m_center.y - y_sample * m_radius * scale);
 
         // Original color logic (distance determines intensity)
-        float sample_dist = distance(last_screen_pos_for_color_calc, current_screen_pos);
+        float sample_dist = distance(prev_xy, current_screen_pos)/(m_radius*scale);
+
         // `shift` determines green component's brightness, and inverse for red/blue
         // stationary (dist=0) -> shift=255 (white-ish: 255,255,255)
         // fast (dist>=2.55) -> shift=0 (green: 0,255,0)
-        uint8_t shift = static_cast<uint8_t>(std::max(0.f, 255.f - std::min(sample_dist * 100.f, 255.f)));
-        sf::Color vertex_color(shift, 255, shift, 255);
+        uint8_t shift = static_cast<uint8_t>(255.f - std::min(sample_dist * 500.f, 255.f));
+        uint8_t alpha = shift;
+        //std::cout << (255.f - std::min(sample_dist * 10000.f, 255.f)) << " ";
 
-        center_line_points.push_back(sf::Vertex(current_screen_pos, vertex_color));
-        last_screen_pos_for_color_calc = current_screen_pos; // Update for the next iteration's color calc
+        center_line_points.push_front(sf::Vertex(current_screen_pos,sf::Color(0, 255, 0, alpha)));
+        alpha_values.push_front(alpha);
+
+        if (center_line_points.size() > max_points) {
+            center_line_points.pop_back();
+            alpha_values.pop_back();
+        }
+        prev_xy = current_screen_pos; // Update for the next iteration's color calc
     }
 // Update the last processed point for the next call to onProcessSamples
     if (!center_line_points.empty()) {
-        // If center_line_points only had one point (from m_last_processed_center_point)
-        // and sampleCount was 0, this means m_last_processed_center_point is unchanged.
-        // If new points were added, the last one is the new m_last_processed_center_point.
-        m_last_processed_center_point = center_line_points.back();
+        // If center_line_points only had one point (from prev_vertex)
+        // and sampleCount was 0, this means prev_vertex is unchanged.
+        // If new points were added, the last one is the new prev_vertex.
+        prev_vertex = center_line_points.front();
         m_has_valid_last_point = true;
     } else {
         // This case implies sampleCount was 0 and m_has_valid_last_point was initially false.
@@ -145,6 +156,16 @@ bool Oscilloscope::onProcessSamples(const std::int16_t* samples, std::size_t sam
     if (center_line_points.size() < 2) {
         // Need at least two points to define a line segment for the strip.
         return true;
+    }
+
+    for (std::size_t i = 0; i < center_line_points.size(); i++) {
+        sf::Color oc = center_line_points[i].color;
+        float da = 255.f*static_cast<float>(i)/static_cast<float>(center_line_points.size());
+        uint8_t alpha = 0;
+        if (alpha_values[i] >= da) {
+            alpha = alpha_values[i]-static_cast<uint8_t>(da);
+        }
+        center_line_points[i].color = sf::Color(oc.r, oc.g, oc.b, static_cast<uint8_t>(alpha));
     }
 
     for (std::size_t i = 0; i < center_line_points.size(); ++i) {
@@ -204,22 +225,4 @@ void Oscilloscope::draw(sf::RenderTarget& target, sf::RenderStates states) const
 
     // Draw the main, centered line
     target.draw(m_triangle_strip, states);
-    /*
-    // Create copies with offsets for a thicker line effect
-    sf::RenderStates offsetStates = states; // Copy original states
-    static constexpr unsigned int nCirclePts = 8; // Number of points to create a "circular" offset
-
-    for (unsigned int i = 0; i < n_layers; ++i) {
-        for (unsigned int j = 0; j < nCirclePts; ++j) {
-            float angle = (2.f * static_cast<float>(std::numbers::pi) * static_cast<float>(j)) / static_cast<float>(nCirclePts);
-            float offsetDistance = (static_cast<float>(i) + 1.f) * m_thickness;
-            
-            // Reset transform to original state's transform before applying new translation
-            offsetStates.transform = states.transform; 
-            offsetStates.transform.translate(sf::Vector2f(offsetDistance * std::cos(angle), offsetDistance * std::sin(angle)));
-            
-            target.draw(m_vertices, offsetStates);
-        }
-    }
-    */
 }
