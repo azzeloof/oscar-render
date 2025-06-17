@@ -59,25 +59,37 @@ public:
     float getTraceThickness() const;
 
     /**
+     * @brief Sets the trace color (RGBA).
+     * @param c SFML color.
+     */
+    void setTraceColor(sf::Color c);
+
+    /**
+     * @brief Gets the trace color.
+     * @return SFML color (RGBA).
+     */
+    sf::Color getTraceColor() const;
+
+    /**
      * @brief Sets the maximum number of frames for persistence effect.
      * @param n Number of frames.
      */
-    void setPersistenceFrames(unsigned int n);
+    void setPersistenceSamples(unsigned int n);
 
     /**
-     * @brief Gets the maximum number of frames for persistence effect.
-     * @return Number of persistence frames.
+     * @brief Gets the maximum number of points for persistence effect.
+     * @return Number of persistence points.
      */
-    unsigned int getPersistenceFrames() const;
+    unsigned int getPersistenceSamples() const;
 
     /**
-     * @brief Sets the strength of the oldest persistent frame's visibility.
+     * @brief Sets the strength of the oldest persistent points's visibility.
      * @param n Strength value (typically 0-255).
      */
     void setPersistenceStrength(unsigned int n);
 
     /**
-     * @brief Gets the strength of the oldest persistent frame's visibility.
+     * @brief Gets the strength of the oldest persistent points's visibility.
      * @return Persistence strength.
      */
     unsigned int getPersistenceStrength() const;
@@ -106,6 +118,18 @@ public:
      */
     float getBlurSpread() const;
 
+    /**
+     * @brief Sets the alpha scale.
+     * @param a Alpha scale value (typically 0-10000).
+     */
+    void setAlphaScale(unsigned int a);
+
+    /**
+     * @brief Gets the alpha scale.
+     * @return BAlpha scale.
+     */
+    unsigned int getAlphaScale() const;
+
 private:
     /**
      * @brief Called by SFML when new audio samples are available.
@@ -126,9 +150,7 @@ private:
     sf::Vector2f m_center;              // Center point of the oscilloscope display area.
     //sf::VertexArray m_vertices;         // Vertex array for drawing the audio waveform.
     mutable std::mutex m_mutex;         // Mutex for thread-safe access to m_vertices.
-    
-    // This member was in the original class but not used by its methods.
-    // It might be intended for future use or external management.
+
     std::vector<std::string> m_availableDevices; 
 
     float prev_x_pos = 0.f;
@@ -137,7 +159,6 @@ private:
     sf::VertexArray m_triangle_strip;
     std::deque<sf::Vertex> center_line_points;
     std::deque<uint8_t> alpha_values;
-    uint16_t max_points = 20000;
     bool m_has_valid_last_point;
     //sf::Vertex prev_final_vertex;
 
@@ -145,9 +166,11 @@ private:
     float scale = 1.f;                      // Scale of the displayed trace
     float m_thickness = 1.f;                // Thickness of the trace.
     unsigned int n_layers = 3;              // Number of layers for visual thickness.
-    unsigned int maxPersistentFrames = 1;   // Max frames for persistence effect (used by main loop).
+    unsigned int maxPersistentSamples = 10000;  // Max points for persistence effect (used by main loop).
     unsigned int persistenceStrength = 0;   // Strength of oldest persistent frame (used by main loop).
     float gaussianBlurSpread = 0.f;         // Controls how "wide" the blur is.
+    sf::Color trace_color = sf::Color::Green;
+    unsigned int alpha_scale = 5000;
 };
 
 #endif // OSCILLOSCOPE_HPP

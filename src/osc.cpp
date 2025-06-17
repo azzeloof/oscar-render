@@ -15,53 +15,87 @@ void OSCListener::ProcessMessage(const osc::ReceivedMessage& m, const IpEndpoint
         // --- Lock the mutex before accessing or modifying shared data ---
         std::lock_guard<std::mutex> lock(param_mutex_);
 
-        // --- Parse specific OSC messages ---
-        if (std::strcmp(m.AddressPattern(), "/oscilloscope/thickness") == 0) {
-            float val;
-            args >> val >> osc::EndMessage; // Ensure all arguments are consumed
-            if (val >= 1.f) { 
-                trace_thickness_update_ = val;
-                std::cout << "  OSC: Trace thickness update queued: " << *trace_thickness_update_ << std::endl;
+        if (std::strncmp(m.AddressPattern(), "/scope/", 7) == 0) {
+            // This is a simplified approach and assumes a single digit index.
+            int scope_index = m.AddressPattern()[7] - '0'; // Convert char to int
+            rcv_index = scope_index;
+
+            // Basic validation for the scope index
+            if (scope_index >= 0 && scope_index < 4) { // Assuming 4 scopes (0-3)
+                // Now check the rest of the address pattern for parameters
+                const char* param_pattern = m.AddressPattern() + 8; // Skip "/scope/X"
+                std::cout << "OSC: Scope Index: " << scope_index << std::endl;
+                std::cout << "OSC: Param Pattern: " << param_pattern << std::endl;
+
+                // --- Parse specific OSC messages ---
+                if (std::strcmp(param_pattern, "/trace/thickness") == 0) {
+                    float val;
+                    args >> val >> osc::EndMessage; // Ensure all arguments are consumed
+                    if (val >= 1.f) { 
+                        trace_thickness_update_ = val;
+                        std::cout << "  OSC: Trace thickness update queued: " << *trace_thickness_update_ << std::endl;
+                    } else {
+                        std::cerr << "  OSC: Invalid trace thickness received: " << val << std::endl;
+                    }
+                } else if (std::strcmp(param_pattern, "/persistence/samples") == 0) {
+                    osc::int32 val;
+                    args >> val >> osc::EndMessage;
+                    if (val > 0) {
+                        persistence_samples_update_ = static_cast<unsigned int>(val);
+                        std::cout << "  OSC: Persistence Samples update queued: " << *persistence_samples_update_ << std::endl;
+                    } else {
+                        std::cerr << "  OSC: Invalid persistence samples received: " << val << std::endl;
+                    }
+                } else if (std::strcmp(param_pattern, "/persistence/strength") == 0) {
+                    osc::int32 val; // Assuming strength is sent as int 0-255
+                    args >> val >> osc::EndMessage;
+                    if (val >= 0 && val <= 255) {
+                        persistence_strength_update_ = static_cast<unsigned int>(val);
+                        std::cout << "  OSC: Persistence Strength update queued: " << *persistence_strength_update_ << std::endl;
+                    } else {
+                        std::cerr << "  OSC: Invalid persistence strength (0-255) received: " << val << std::endl;
+                    }
+                } else if (std::strcmp(param_pattern, "/trace/color") == 0) {
+                    osc::int32 val;
+                    args >> val >> osc::EndMessage;
+                    //if (val >= 0) {
+                        trace_color_update_ = static_cast<unsigned int>(val);
+                        std::cout << "  OSC: Trace Color update queued: " << *trace_color_update_ << std::endl;
+                    //} else {
+                    //    std::cerr << "  OSC: Trace Color strength received: " << val << std::endl;
+                    //}
+                } else if (std::strcmp(param_pattern, "/trace/blur") == 0) {
+                    float val; // OSC 'f' type tag
+                    args >> val >> osc::EndMessage;
+                    // Add validation for blur spread
+                    if (val >= 0.0f) { 
+                        blur_spread_update_ = val;
+                        std::cout << "  OSC: Blur Spread update queued: " << *blur_spread_update_ << std::endl;
+                    } else {
+                        std::cerr << "  OSC: Invalid blur spread received: " << val << std::endl;
+                    }
+                } else if (std::strcmp(param_pattern, "/alpha_scale") == 0) {
+                    osc::int32 val;
+                    args >> val >> osc::EndMessage;
+                    if (val >= 0) {
+                        alpha_scale_update_ = static_cast<unsigned int>(val);
+                        std::cout << "  OSC: Alpha Scale update queued: " << *alpha_scale_update_ << std::endl;
+                    } else {
+                        std::cerr << "  OSC: Invalid alpha scale received: " << val << std::endl;
+                    }
+                } else if (std::strcmp(param_pattern, "/scale") == 0) {
+                    float val; // OSC 'f' type tag
+                    args >> val >> osc::EndMessage;
+                    // Add validation for scale
+                    if (val >= 0.0f && val <= 1.0f) { 
+                        scale_update_ = val;
+                        std::cout << "  OSC: Scale update queued: " << *scale_update_ << std::endl;
+                    } else {
+                        std::cerr << "  OSC: Scale received: " << val << std::endl;
+                    }
+                }
             } else {
-                std::cerr << "  OSC: Invalid trace thickness received: " << val << std::endl;
-            }
-        } else if (std::strcmp(m.AddressPattern(), "/oscilloscope/persistence/frames") == 0) {
-            osc::int32 val;
-            args >> val >> osc::EndMessage;
-            if (val >= 0) { // Persistence frames can be 0
-                persistence_frames_update_ = static_cast<unsigned int>(val);
-                std::cout << "  OSC: Persistence Frames update queued: " << *persistence_frames_update_ << std::endl;
-            } else {
-                std::cerr << "  OSC: Invalid persistence frames received: " << val << std::endl;
-            }
-        } else if (std::strcmp(m.AddressPattern(), "/oscilloscope/persistence/strength") == 0) {
-            osc::int32 val; // Assuming strength is sent as int 0-255
-            args >> val >> osc::EndMessage;
-            if (val >= 0 && val <= 255) {
-                persistence_strength_update_ = static_cast<unsigned int>(val);
-                std::cout << "  OSC: Persistence Strength update queued: " << *persistence_strength_update_ << std::endl;
-            } else {
-                std::cerr << "  OSC: Invalid persistence strength (0-255) received: " << val << std::endl;
-            }
-        } else if (std::strcmp(m.AddressPattern(), "/oscilloscope/blur") == 0) {
-            float val; // OSC 'f' type tag
-            args >> val >> osc::EndMessage;
-            // Add validation for blur spread
-            if (val >= 0.0f) { 
-                 blur_spread_update_ = val;
-                 std::cout << "  OSC: Blur Spread update queued: " << *blur_spread_update_ << std::endl;
-            } else {
-                std::cerr << "  OSC: Invalid blur spread received: " << val << std::endl;
-            }
-        } else if (std::strcmp(m.AddressPattern(), "/oscilloscope/scale") == 0) {
-            float val; // OSC 'f' type tag
-            args >> val >> osc::EndMessage;
-            // Add validation for scale
-            if (val >= 0.0f && val <= 1.0f) { 
-                 scale_update_ = val;
-                 std::cout << "  OSC: Scale update queued: " << *scale_update_ << std::endl;
-            } else {
-                std::cerr << "  OSC: Scale received: " << val << std::endl;
+                std::cerr << "  OSC: Invalid scope index received: " << scope_index << std::endl;
             }
         }
 
@@ -79,10 +113,10 @@ std::optional<unsigned int> OSCListener::getPendingTraceThickness() {
     return val;
 }
 
-std::optional<unsigned int> OSCListener::getPendingPersistenceFrames() {
+std::optional<unsigned int> OSCListener::getPendingPersistenceSamples() {
     std::lock_guard<std::mutex> lock(param_mutex_);
-    std::optional<unsigned int> val = persistence_frames_update_;
-    persistence_frames_update_.reset();
+    std::optional<unsigned int> val = persistence_samples_update_;
+    persistence_samples_update_.reset();
     return val;
 }
 
@@ -93,6 +127,13 @@ std::optional<unsigned int> OSCListener::getPendingPersistenceStrength() {
     return val;
 }
 
+std::optional<uint32_t> OSCListener::getPendingTraceColor() {
+    std::lock_guard<std::mutex> lock(param_mutex_);
+    std::optional<uint32_t> val = trace_color_update_;
+    trace_color_update_.reset();
+    return val;
+}
+
 std::optional<float> OSCListener::getPendingBlurSpread() {
     std::lock_guard<std::mutex> lock(param_mutex_);
     std::optional<float> val = blur_spread_update_;
@@ -100,11 +141,23 @@ std::optional<float> OSCListener::getPendingBlurSpread() {
     return val;
 }
 
+std::optional<unsigned int> OSCListener::getPendingAlphaScale() {
+    std::lock_guard<std::mutex> lock(param_mutex_);
+    std::optional<unsigned int> val = alpha_scale_update_;
+    alpha_scale_update_.reset();
+    return val;
+}
+
+
 std::optional<float> OSCListener::getPendingScale() {
     std::lock_guard<std::mutex> lock(param_mutex_);
     std::optional<float> val = scale_update_;
     scale_update_.reset();
     return val;
+}
+
+int::OSCListener::getIndex() {
+    return rcv_index;
 }
 
 AsioOscReceiver::AsioOscReceiver(asio::io_context& io_context, OSCListener& listener)

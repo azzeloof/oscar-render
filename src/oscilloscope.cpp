@@ -29,7 +29,7 @@ Oscilloscope::Oscilloscope() : m_has_valid_last_point(false), m_thickness(1.f) {
 void Oscilloscope::updateView(const sf::Vector2u& newSize) {
     m_center.x = static_cast<float>(newSize.x) / 2.f;
     m_center.y = static_cast<float>(newSize.y) / 2.f;
-    m_radius = std::min(static_cast<float>(newSize.x), static_cast<float>(newSize.y)) / 1.5f;
+    m_radius = std::min(static_cast<float>(newSize.x), static_cast<float>(newSize.y)) / 2.0f;
 }
 
 bool Oscilloscope::startRecording(const std::string& deviceName) {
@@ -49,12 +49,24 @@ float Oscilloscope::getTraceThickness() const {
     return m_thickness;
 }
 
-void Oscilloscope::setPersistenceFrames(unsigned int n) {
-    maxPersistentFrames = n;
+void Oscilloscope::setTraceColor(sf::Color c) {
+    trace_color = c;
 }
 
-unsigned int Oscilloscope::getPersistenceFrames() const {
-    return maxPersistentFrames;
+sf::Color Oscilloscope::getTraceColor() const {
+    return trace_color;
+}
+
+void Oscilloscope::setPersistenceSamples(unsigned int n) {
+    maxPersistentSamples = n;
+    //alpha_values.clear();
+    //center_line_points.clear();
+    alpha_values.resize(n);
+    center_line_points.resize(n);
+}
+
+unsigned int Oscilloscope::getPersistenceSamples() const {
+    return maxPersistentSamples;
 }
 
 void Oscilloscope::setPersistenceStrength(unsigned int n) {
@@ -81,19 +93,17 @@ float Oscilloscope::getBlurSpread() const {
     return gaussianBlurSpread;
 }
 
+void Oscilloscope::setAlphaScale(unsigned int a) {
+    alpha_scale = a;
+}
+
+unsigned int Oscilloscope::getAlphaScale() const {
+    return alpha_scale;
+}
+
 
 bool Oscilloscope::onProcessSamples(const std::int16_t* samples, std::size_t sampleCount) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    //m_vertices.clear();
-    //m_vertices.setPrimitiveType(sf::PrimitiveType::LineStrip);
-    //m_vertices.append(prev_final_vertex);
-    //std::vector<sf::Vertex> center_line_points;
-    //if (m_has_valid_last_point) {
-    //    center_line_points.push_front(prev_vertex);
-    //}
-    //if (center_line_points.size() > max_points) {
-    //    center_line_points.pop_back();
-    //}
     sf::Vector2f prev_xy;
     if (m_has_valid_last_point) {
         prev_xy = prev_vertex.position;
@@ -120,18 +130,12 @@ bool Oscilloscope::onProcessSamples(const std::int16_t* samples, std::size_t sam
 
         // Original color logic (distance determines intensity)
         float sample_dist = distance(prev_xy, current_screen_pos)/(m_radius*scale);
+        uint8_t alpha = static_cast<uint8_t>(255.f - std::min(sample_dist * alpha_scale, 255.f));
 
-        // `shift` determines green component's brightness, and inverse for red/blue
-        // stationary (dist=0) -> shift=255 (white-ish: 255,255,255)
-        // fast (dist>=2.55) -> shift=0 (green: 0,255,0)
-        uint8_t shift = static_cast<uint8_t>(255.f - std::min(sample_dist * 500.f, 255.f));
-        uint8_t alpha = shift;
-        //std::cout << (255.f - std::min(sample_dist * 10000.f, 255.f)) << " ";
-
-        center_line_points.push_front(sf::Vertex(current_screen_pos,sf::Color(0, 255, 0, alpha)));
+        center_line_points.push_front(sf::Vertex(current_screen_pos,sf::Color(trace_color.r, trace_color.g, trace_color.b, alpha)));
         alpha_values.push_front(alpha);
 
-        if (center_line_points.size() > max_points) {
+        if (center_line_points.size() > maxPersistentSamples) {
             center_line_points.pop_back();
             alpha_values.pop_back();
         }

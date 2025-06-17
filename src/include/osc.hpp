@@ -22,10 +22,13 @@ public:
     virtual ~OSCListener();
     
     std::optional<unsigned int> getPendingTraceThickness();
-    std::optional<unsigned int> getPendingPersistenceFrames();
+    std::optional<unsigned int> getPendingPersistenceSamples();
     std::optional<unsigned int> getPendingPersistenceStrength();
+    std::optional<uint32_t> getPendingTraceColor();
     std::optional<float> getPendingBlurSpread();
+    std::optional<unsigned int> getPendingAlphaScale();
     std::optional<float> getPendingScale();
+    int getIndex();
 
 protected:
     virtual void ProcessMessage(const osc::ReceivedMessage& m, const IpEndpointName& remoteEndpoint) override;
@@ -35,10 +38,14 @@ private:
     // Store pending updates. std::optional indicates if a new value has been received.
     // If an optional contains a value, it means an OSC message for that parameter came in.
     std::optional<unsigned int> trace_thickness_update_;
-    std::optional<unsigned int> persistence_frames_update_;
+    std::optional<unsigned int> persistence_samples_update_;
     std::optional<unsigned int> persistence_strength_update_;
+    std::optional<uint32_t> trace_color_update_;
     std::optional<float> blur_spread_update_;
+    std::optional<unsigned int> alpha_scale_update_;
     std::optional<float> scale_update_;
+
+    int rcv_index = 0;
 };
 
 class AsioOscReceiver {

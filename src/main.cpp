@@ -57,20 +57,26 @@ int main() {
     const std::string& selectedDevice = availableDevices[deviceIndex];
     
     // Oscilloscope and Window Setup
-    Oscilloscope oscilloscope;
-    oscilloscope.setChannelCount(2);
-    if (!oscilloscope.startRecording(selectedDevice)) { /* ... */ return -1; }
+    //Oscilloscope oscilloscope;
+    const std::size_t nScopes = 4;
+    std::array<Oscilloscope, nScopes> scopes;
+    for (int i=0; i<nScopes; i++) {
+        scopes[i].setChannelCount(2);
+        if (!scopes[i].startRecording(selectedDevice)) { /* ... */ return -1; }
+    }
     std::cout << "Listening to device: " << selectedDevice << std::endl;
-    sf::RenderWindow window(sf::VideoMode({width, height}), "C++ Virtual Oscilloscope");
+    sf::ContextSettings ctx;
+    //ctx.antiAliasingLevel = 16;
+    sf::RenderWindow window(sf::VideoMode({width, height}), "C++ Virtual Oscilloscope", sf::State::Windowed, ctx);
     window.setFramerateLimit(60);
-    oscilloscope.updateView(window.getSize());
+    for (int i=0; i<nScopes; i++) {
+        scopes[i].updateView(window.getSize());
+    }
 
     sf::RenderTexture traceTexture({width, height});
     sf::RenderTexture compositeTexture({width, height});
     sf::RenderTexture blurTexture({width, height});
     sf::RenderTexture frameTexture({width, height});
-
-    std::deque<sf::Texture> persistentFrames;
 
     sf::Shader gaussianBlurShader;
     if (!gaussianBlurShader.loadFromFile("blur.frag", sf::Shader::Type::Fragment)) {
@@ -96,106 +102,99 @@ int main() {
                 blurTexture = sf::RenderTexture(sizeVec);
                 frameTexture = sf::RenderTexture(sizeVec);
                 compositeTexture = sf::RenderTexture(sizeVec);
-                persistentFrames.clear();
-                oscilloscope.updateView(sizeVec);
+                for (int i=0; i<nScopes; i++) {
+                    scopes[i].updateView(sizeVec);
+                }
             }
         }
+        int scope_index = osc_listener_handler.getIndex();
 
         if (auto val_opt = osc_listener_handler.getPendingTraceThickness()) {
             // val_opt is a std::optional<unsigned int>.
             // Check if it contains a value (it will if an update was queued).
             if (val_opt) {
-                oscilloscope.setTraceThickness(*val_opt); // Use *val_opt to get the value
-                std::cout << "Main: Applied Layers set to: " << oscilloscope.getTraceThickness() << std::endl;
+                scopes[scope_index].setTraceThickness(*val_opt); // Use *val_opt to get the value
+                std::cout << "Main: Applied Layers set to: " << scopes[scope_index].getTraceThickness() << std::endl;
             }
         }
 
-        if (auto val_opt = osc_listener_handler.getPendingPersistenceFrames()) {
+        if (auto val_opt = osc_listener_handler.getPendingTraceColor()) {
             if (val_opt) {
-                oscilloscope.setPersistenceFrames(*val_opt);
-                persistentFrames.clear();
-                std::cout << "Main: Applied Persistence Frames set to: " << oscilloscope.getPersistenceFrames() << std::endl;
+                uint8_t R = (*val_opt) >> 24;
+                uint8_t G = (*val_opt) >> 16;
+                uint8_t B = (*val_opt) >> 8;
+                uint8_t A = (*val_opt);
+                std::cout << R << G << B << A << '\n';
+                scopes[scope_index].setTraceColor(sf::Color(R, G, B, A));
+                std::cout << "Main: Applied Color Changed" << std::endl;
+            }
+        }
+
+        if (auto val_opt = osc_listener_handler.getPendingPersistenceSamples()) {
+            if (val_opt) {
+                scopes[scope_index].setPersistenceSamples(*val_opt);
+                std::cout << "Main: Applied Persistence Frames set to: " << scopes[scope_index].getPersistenceSamples() << std::endl;
             }
         }
 
         if (auto val_opt = osc_listener_handler.getPendingPersistenceStrength()) {
             if (val_opt) {
-                oscilloscope.setPersistenceStrength(*val_opt);
-                std::cout << "Main: Applied Persistence Strength set to: " << oscilloscope.getPersistenceStrength() << std::endl;
+                scopes[scope_index].setPersistenceStrength(*val_opt);
+                std::cout << "Main: Applied Persistence Strength set to: " << scopes[scope_index].getPersistenceStrength() << std::endl;
             }
         }
 
         if (auto val_opt = osc_listener_handler.getPendingBlurSpread()) {
             if (val_opt) {
-                oscilloscope.setBlurSpread(*val_opt);
-                std::cout << "Main: Applied Gaussian Blur Spread set to: " << oscilloscope.getBlurSpread() << std::endl;
+                scopes[scope_index].setBlurSpread(*val_opt);
+                std::cout << "Main: Applied Gaussian Blur Spread set to: " << scopes[scope_index].getBlurSpread() << std::endl;
+            }
+        }
+
+        if (auto val_opt = osc_listener_handler.getPendingAlphaScale()) {
+            if (val_opt) {
+                scopes[scope_index].setAlphaScale(*val_opt);
+                std::cout << "Main: Applied Alpha Scale set to: " << scopes[scope_index].getAlphaScale() << std::endl;
             }
         }
 
         if (auto val_opt = osc_listener_handler.getPendingScale()) {
             if (val_opt) {
-                oscilloscope.setScale(*val_opt);
-                std::cout << "Main: Applied Scale set to: " << oscilloscope.getScale() << std::endl;
+                scopes[scope_index].setScale(*val_opt);
+                std::cout << "Main: Applied Scale set to: " << scopes[scope_index].getScale() << std::endl;
             }
         }
 
-        traceTexture.clear(sf::Color::Transparent);
-        traceTexture.draw(oscilloscope);
-        traceTexture.display();
-        /*
-        if (persistentFrames.size() >= oscilloscope.getPersistenceFrames()) {
-            persistentFrames.pop_back(); 
-        }
-        persistentFrames.push_front(traceTexture.getTexture()); // Add a copy
+        window.clear(sf::Color::Transparent);
 
-        compositeTexture.clear(sf::Color::Black);
+        for (int i=0; i<nScopes; i++) {
 
-        for (size_t i = 0; i < persistentFrames.size(); ++i) {
-        //for (size_t i = persistentFrames.size(); i > 0; --i) {
-            sf::Sprite frameSprite(persistentFrames[i]);
-            
-            float alphaRatio = 1.0f;
-            if (persistentFrames.size() > 1) { // Avoid division by zero if only 1 frame
-                 alphaRatio = 1.0f - (static_cast<float>(i) / (persistentFrames.size() -1) );
-            }
-            std::uint8_t alpha = 0;
-            if (i == 0) { 
-                alpha = 255;
-            } else {
-                //float fadeFactor = static_cast<float>(oscilloscope.getPersistenceStrength()) / 255.f; // How much the oldest frame retains opacity
-                //alpha = static_cast<std::uint8_t>(255.f * ( ( (oscilloscope.getPersistenceFrames() - 1.f - i) / (oscilloscope.getPersistenceFrames() -1.f) ) * (1.f - fadeFactor) + fadeFactor ) );
-                //if (i == oscilloscope.getPersistenceFrames() -1) alpha = static_cast<std::uint8_t>(255.f * fadeFactor); // Oldest frame
-                alpha = static_cast<std::uint8_t>(255.f * (1.f - static_cast<float>(i) / static_cast<float>(oscilloscope.getPersistenceFrames())));
-            }
-
-            sf::Color oc = frameSprite.getColor();
-            frameSprite.setColor(sf::Color(oc.r, oc.g, oc.b, alpha));
-            compositeTexture.draw(frameSprite, sf::BlendAlpha);
-        }
-        */
-
-                // Gaussian Blur Pass 1: Horizontal
-        gaussianBlurShader.setUniform("texture", compositeTexture.getTexture());
-        gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(traceTexture.getSize()));
-        gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
-        gaussianBlurShader.setUniform("blur_spread_px", oscilloscope.getBlurSpread());
+            traceTexture.clear(sf::Color::Transparent);
+            traceTexture.draw(scopes[i]);
         
-        blurTexture.clear(sf::Color::Transparent);
-        blurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
-        blurTexture.display();
+            traceTexture.display();
 
-        // Gaussian Blur Pass 2: Vertical
-        gaussianBlurShader.setUniform("texture", blurTexture.getTexture());
-        gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(0.f, 1.f));
+            // Gaussian Blur Pass 1: Horizontal
+            gaussianBlurShader.setUniform("texture", compositeTexture.getTexture());
+            gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(traceTexture.getSize()));
+            gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
+            gaussianBlurShader.setUniform("blur_spread_px", scopes[i].getBlurSpread());
+            
+            blurTexture.clear(sf::Color::Transparent);
+            blurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
+            blurTexture.display();
 
-        // Composite and Display
-        frameTexture.clear(sf::Color::Transparent);
-        frameTexture.draw(sf::Sprite(blurTexture.getTexture()), &gaussianBlurShader);
-        frameTexture.display();
+            // Gaussian Blur Pass 2: Vertical
+            gaussianBlurShader.setUniform("texture", blurTexture.getTexture());
+            gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(0.f, 1.f));
 
-        window.clear(sf::Color::Black);
-        window.draw(sf::Sprite(frameTexture.getTexture()));
+            // Composite and Display
+            frameTexture.clear(sf::Color::Transparent);
+            frameTexture.draw(sf::Sprite(blurTexture.getTexture()), &gaussianBlurShader);
+            frameTexture.display();
 
+            window.draw(sf::Sprite(frameTexture.getTexture()));
+        }
         window.display();
     }
 
@@ -211,7 +210,7 @@ int main() {
     }
     std::cout << "Application finished." << std::endl;
     
-    // oscilloscope.stop(); // sf::SoundRecorder::stop(), might be useful if you want to explicitly stop mic.
+    // scopes[0].stop(); // sf::SoundRecorder::stop(), might be useful if you want to explicitly stop mic.
 
     return 0;
 }
