@@ -74,7 +74,7 @@ ALL_SRCS = $(SRCS) $(OSCPACK_SRCS)
 TARGET_DIR = build
 
 # Executable target path
-TARGET = $(TARGET_DIR)/oscilloscope_emulator
+TARGET = $(TARGET_DIR)/oscar_render
 
 # Object files
 OBJS = $(addprefix $(TARGET_DIR)/, $(notdir $(ALL_SRCS:.cpp=.o)))

@@ -67,7 +67,7 @@ int main() {
     std::cout << "Listening to device: " << selectedDevice << std::endl;
     sf::ContextSettings ctx;
     //ctx.antiAliasingLevel = 16;
-    sf::RenderWindow window(sf::VideoMode({width, height}), "C++ Virtual Oscilloscope", sf::State::Windowed, ctx);
+    sf::RenderWindow window(sf::VideoMode({width, height}), "OSCAR", sf::State::Windowed, ctx);
     window.setFramerateLimit(60);
     for (int i=0; i<nScopes; i++) {
         scopes[i].updateView(window.getSize());
