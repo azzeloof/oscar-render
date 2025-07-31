@@ -10,9 +10,42 @@
 #include <deque>
 #include <numbers>
 #include <thread>
+#include <stdexcept>
 
 #include "include/oscilloscope.hpp"
 #include "include/osc.hpp"
+#include "RtAudio.h"
+
+const std::size_t nScopes = 4;
+std::array<Oscilloscope, nScopes> scopes;
+std::vector<int16_t> audioBuffer;
+// The global mutex was removed, as locking is handled inside each Oscilloscope instance.
+
+// Audio callback function for RtAudio
+int audioCallback(void* /*outputBuffer*/, void* inputBuffer, unsigned int nFrames,
+    double /*streamTime*/, RtAudioStreamStatus status, void* /*userData*/) {
+    if (status) {
+        std::cerr << "Stream overflow detected!" << std::endl;
+    }
+
+    // The lock_guard was removed to prevent blocking the high-priority audio thread.
+    const int16_t* input = (const int16_t*)inputBuffer;
+
+    for (unsigned int i = 0; i < nScopes; ++i) {
+        // This temporary buffer is fine, as it's local to the audio thread.
+        std::vector<int16_t> scopeAudioBuffer;
+        scopeAudioBuffer.reserve(nFrames * 2);
+        for (unsigned int j = 0; j < nFrames; ++j) {
+            scopeAudioBuffer.push_back(input[j * 8 + i * 2]);
+            scopeAudioBuffer.push_back(input[j * 8 + i * 2 + 1]);
+        }
+        // Each scope's processSamples method handles its own thread safety.
+        scopes[i].processSamples(scopeAudioBuffer.data(), scopeAudioBuffer.size());
+    }
+
+    return 0;
+}
+
 
 int main() {
     asio::io_context io_context;
@@ -23,14 +56,11 @@ int main() {
         osc_receiver = std::make_unique<AsioOscReceiver>(io_context, osc_listener_handler);
     } catch (const std::exception& e) {
         std::cerr << "Failed to initialize OSC receiver: " << e.what() << std::endl;
-        return -1; // Or handle error appropriately
+        return -1;
     }
 
-    // Create and run the Asio I/O context in a separate thread
     std::thread asio_thread([&io_context]() {
         try {
-            // Add a work guard to keep io_context::run() active
-            // as long as there are asynchronous operations (like our listener).
             asio::executor_work_guard<asio::io_context::executor_type> work_guard = asio::make_work_guard(io_context);
             io_context.run();
         } catch (const std::exception& e) {
@@ -40,36 +70,43 @@ int main() {
 
     unsigned int width = 800;
     unsigned int height = 600;
-    // Device Selection
-    auto availableDevices = sf::SoundRecorder::getAvailableDevices();
-    
-    if (availableDevices.empty()) {
-        std::cerr << "Error: No audio devices available." << std::endl;
+
+    // --- RtAudio Setup using JACK Backend ---
+    RtAudio audio(RtAudio::UNIX_JACK);
+    if (audio.getDeviceCount() < 1) {
+        std::cerr << "Error: No audio devices found by the JACK backend.\n"
+                  << "Please ensure the PipeWire-JACK compatibility layer is running." << std::endl;
         return -1;
     }
-
-    std::cout << "Available audio devices:" << std::endl;
-    for (size_t i = 0; i < availableDevices.size(); ++i) { std::cout << i << ": " << availableDevices[i] << std::endl; }
-    std::cout << "Enter the number of the device to use: ";
-    int deviceIndex;
-    std::cin >> deviceIndex;
-    if (deviceIndex < 0 || static_cast<size_t>(deviceIndex) >= availableDevices.size()) { /* ... */ return -1; }
-    const std::string& selectedDevice = availableDevices[deviceIndex];
     
-    // Oscilloscope and Window Setup
-    //Oscilloscope oscilloscope;
-    const std::size_t nScopes = 4;
-    std::array<Oscilloscope, nScopes> scopes;
-    for (int i=0; i<nScopes; i++) {
-        scopes[i].setChannelCount(2);
-        if (!scopes[i].startRecording(selectedDevice)) { /* ... */ return -1; }
+    RtAudio::StreamParameters params;
+    params.deviceId = audio.getDefaultInputDevice();
+    params.nChannels = 8;
+    params.firstChannel = 0;
+    unsigned int sampleRate = 48000;
+    unsigned int bufferFrames = 256;
+
+    // --- FIX: Add StreamOptions to prevent auto-connecting and set a custom name ---
+    RtAudio::StreamOptions options;
+    options.flags = RTAUDIO_JACK_DONT_CONNECT;
+    options.streamName = "OSCAR";
+
+    try {
+        audio.openStream(NULL, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
+        audio.startStream();
+        std::cout << "Successfully opened 8-channel JACK input stream." << std::endl;
+        std::cout << "Application should be visible in qpwgraph as '" << options.streamName << "'." << std::endl;
     }
-    std::cout << "Listening to device: " << selectedDevice << std::endl;
+    catch (const std::exception& e) {
+        std::cerr << "Error opening audio stream: " << e.what() << std::endl;
+        return -1;
+    }
+    
+    // --- SFML 3 API Setup ---
     sf::ContextSettings ctx;
-    //ctx.antiAliasingLevel = 16;
     sf::RenderWindow window(sf::VideoMode({width, height}), "OSCAR", sf::State::Windowed, ctx);
     window.setFramerateLimit(60);
-    for (int i=0; i<nScopes; i++) {
+    for (unsigned int i=0; i<nScopes; i++) {
         scopes[i].updateView(window.getSize());
     }
 
@@ -83,17 +120,17 @@ int main() {
         std::cerr << "Error: Could not load blur.frag shader." << std::endl;
         return -1;
     }
-    gaussianBlurShader.setUniform("texture", sf::Shader::CurrentTexture); // This will be the input texture to the shader
+    gaussianBlurShader.setUniform("texture", sf::Shader::CurrentTexture);
 
-    // Main Application Loop
     while (window.isOpen()) {
+        // SFML 3 Event Loop
         while (const auto event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
             }
 
-            if (event->is<sf::Event::Resized>()) {
-                sf::Vector2u sizeVec = window.getSize();
+            if (const auto* resized = event->getIf<sf::Event::Resized>()) {
+                sf::Vector2u sizeVec = {resized->size.x, resized->size.y};
                 sf::FloatRect viewRect({0.f, 0.f}, {static_cast<float>(sizeVec.x), static_cast<float>(sizeVec.y)});
                 width = sizeVec.x;
                 height = sizeVec.y;
@@ -102,7 +139,7 @@ int main() {
                 blurTexture = sf::RenderTexture(sizeVec);
                 frameTexture = sf::RenderTexture(sizeVec);
                 compositeTexture = sf::RenderTexture(sizeVec);
-                for (int i=0; i<nScopes; i++) {
+                for (unsigned int i=0; i<nScopes; i++) {
                     scopes[i].updateView(sizeVec);
                 }
             }
@@ -110,10 +147,8 @@ int main() {
         int scope_index = osc_listener_handler.getIndex();
 
         if (auto val_opt = osc_listener_handler.getPendingTraceThickness()) {
-            // val_opt is a std::optional<unsigned int>.
-            // Check if it contains a value (it will if an update was queued).
             if (val_opt) {
-                scopes[scope_index].setTraceThickness(*val_opt); // Use *val_opt to get the value
+                scopes[scope_index].setTraceThickness(*val_opt);
                 std::cout << "Main: Applied Layers set to: " << scopes[scope_index].getTraceThickness() << std::endl;
             }
         }
@@ -167,14 +202,13 @@ int main() {
 
         window.clear(sf::Color::Transparent);
 
-        for (int i=0; i<nScopes; i++) {
+        for (unsigned int i=0; i<nScopes; i++) {
 
             traceTexture.clear(sf::Color::Transparent);
             traceTexture.draw(scopes[i]);
         
             traceTexture.display();
 
-            // Gaussian Blur Pass 1: Horizontal
             gaussianBlurShader.setUniform("texture", compositeTexture.getTexture());
             gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(traceTexture.getSize()));
             gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
@@ -184,11 +218,9 @@ int main() {
             blurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
             blurTexture.display();
 
-            // Gaussian Blur Pass 2: Vertical
             gaussianBlurShader.setUniform("texture", blurTexture.getTexture());
             gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(0.f, 1.f));
 
-            // Composite and Display
             frameTexture.clear(sf::Color::Transparent);
             frameTexture.draw(sf::Sprite(blurTexture.getTexture()), &gaussianBlurShader);
             frameTexture.display();
@@ -200,17 +232,20 @@ int main() {
 
     std::cout << "Stopping OSC receiver and Asio context..." << std::endl;
     if (osc_receiver) {
-        osc_receiver->stop(); // Request the OSC receiver to stop and close its socket
+        osc_receiver->stop();
     }
-    io_context.stop();    // Stop the io_context event loop (this will cause io_context.run() to return)
+    io_context.stop();
 
-    // Wait for the Asio thread to finish its work
     if (asio_thread.joinable()) {
         asio_thread.join();
     }
+
+    if (audio.isStreamOpen()) {
+        audio.stopStream();
+        audio.closeStream();
+    }
+    
     std::cout << "Application finished." << std::endl;
     
-    // scopes[0].stop(); // sf::SoundRecorder::stop(), might be useful if you want to explicitly stop mic.
-
     return 0;
 }

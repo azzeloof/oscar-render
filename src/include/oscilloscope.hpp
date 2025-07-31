@@ -22,13 +22,10 @@ float distance(const sf::Vector2f& p1, const sf::Vector2f& p2);
  * @class Oscilloscope
  * @brief Captures and visualizes stereo audio data in real-time.
  */
-class Oscilloscope : public sf::SoundRecorder, public sf::Drawable {
+class Oscilloscope : public sf::Drawable {
 public:
     // Constructor (default is sufficient here)
     Oscilloscope(); 
-
-    // Destructor (default is sufficient here)
-    // /virtual ~Oscilloscope();
 
     /**
      * @brief Updates the view parameters based on the new window/target size.
@@ -37,14 +34,11 @@ public:
     void updateView(const sf::Vector2u& newSize);
 
     /**
-     * @brief Sets the recording device and starts capturing audio.
-     * @param deviceName The name of the audio input device.
-     * @return True if recording started successfully, false otherwise.
+     * @brief Processes a new chunk of audio samples.
+     * @param samples Pointer to the array of audio samples.
+     * @param sampleCount Number of samples in the array.
      */
-    bool startRecording(const std::string& deviceName);
-    
-    // Make setChannelCount from sf::SoundRecorder publicly accessible
-    using sf::SoundRecorder::setChannelCount;
+    void processSamples(const std::int16_t* samples, std::size_t sampleCount);
 
     /**
      * @brief Sets the trace thickness.
@@ -132,43 +126,28 @@ public:
 
 private:
     /**
-     * @brief Called by SFML when new audio samples are available.
-     * @param samples Pointer to the array of audio samples.
-     * @param sampleCount Number of samples in the array.
-     * @return True to continue recording, false to stop.
-     */
-    virtual bool onProcessSamples(const std::int16_t* samples, std::size_t sampleCount) override;
-
-    /**
      * @brief Called by SFML to draw the oscilloscope to a render target.
      * @param target Render target to draw to.
      * @param states Current render states.
      */
     virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override;
 
-    float m_radius = 0.f;               // Radius of the oscilloscope display area.
-    sf::Vector2f m_center;              // Center point of the oscilloscope display area.
-    //sf::VertexArray m_vertices;         // Vertex array for drawing the audio waveform.
-    mutable std::mutex m_mutex;         // Mutex for thread-safe access to m_vertices.
+    float m_radius = 0.f;
+    sf::Vector2f m_center;
+    mutable std::mutex m_mutex;
 
-    std::vector<std::string> m_availableDevices; 
-
-    float prev_x_pos = 0.f;
-    float prev_y_pos = 0.f;
     sf::Vertex prev_vertex;
     sf::VertexArray m_triangle_strip;
     std::deque<sf::Vertex> center_line_points;
     std::deque<uint8_t> alpha_values;
     bool m_has_valid_last_point;
-    //sf::Vertex prev_final_vertex;
 
     // Parameters
-    float scale = 1.f;                      // Scale of the displayed trace
-    float m_thickness = 1.f;                // Thickness of the trace.
-    unsigned int n_layers = 3;              // Number of layers for visual thickness.
-    unsigned int maxPersistentSamples = 10000;  // Max points for persistence effect (used by main loop).
-    unsigned int persistenceStrength = 0;   // Strength of oldest persistent frame (used by main loop).
-    float gaussianBlurSpread = 0.f;         // Controls how "wide" the blur is.
+    float scale = 1.f;
+    float m_thickness = 1.f;
+    unsigned int maxPersistentSamples = 10000;
+    unsigned int persistenceStrength = 0;
+    float gaussianBlurSpread = 0.f;
     sf::Color trace_color = sf::Color::Green;
     unsigned int alpha_scale = 5000;
 };
