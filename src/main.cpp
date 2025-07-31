@@ -89,7 +89,7 @@ int main() {
     // --- FIX: Add StreamOptions to prevent auto-connecting and set a custom name ---
     RtAudio::StreamOptions options;
     options.flags = RTAUDIO_JACK_DONT_CONNECT;
-    options.streamName = "OSCAR";
+    options.streamName = "OSCAR Renderer";
 
     try {
         audio.openStream(NULL, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
