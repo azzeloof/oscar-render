@@ -12,6 +12,20 @@ Below is some sparse documentation to help you get started with OSCAR.
 
 ## Building
 
+### Linux
+
+1.  Install the required libraries using your package manager. For example, on Debian/Ubuntu:
+
+    ```bash
+    sudo apt-get install libsfml-dev libasio-dev
+    ```
+
+2.  Build the project:
+
+    ```bash
+    make
+    ```
+
 ### macOS (Apple Silicon)
 
 1.  Install Homebrew if you don't have it already.
@@ -27,19 +41,6 @@ Below is some sparse documentation to help you get started with OSCAR.
     make
     ```
 
-### Linux
-
-1.  Install the required libraries using your package manager. For example, on Debian/Ubuntu:
-
-    ```bash
-    sudo apt-get install libsfml-dev libasio-dev
-    ```
-
-2.  Build the project:
-
-    ```bash
-    make
-    ```
 
 ### Windows
 
