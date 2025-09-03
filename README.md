@@ -13,6 +13,7 @@ Below is some sparse documentation to help you get started with OSCAR.
 - Cross-platform architecture (although it hasn't been built for windows yet)
 
 ## Building
+Clone the repo, then run `git submodule update --init` and enter the `src` directory.
 
 ### Linux
 
