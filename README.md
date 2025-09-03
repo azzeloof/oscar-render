@@ -10,13 +10,40 @@ Below is some sparse documentation to help you get started with OSCAR.
 - OSC interface to control rendering parameters (color, thickness, etc) for each channel
 - Cross-platform architecture (although it has only actually been built on Linux so far)
 
-## Building (Linux)
-There are already hooks in the Makefile to build for Mac as well, but is untested. Any help in documenting the build process for Mac or Windows would be appreciated!
+## Building
 
-- Clone the repo
-- Install the SFML libraries for your OS
-- Pull the libraries: `git submodule update --init`
-- `cd src && make`
+### macOS (Apple Silicon)
+
+1.  Install Homebrew if you don't have it already.
+2.  Install the required libraries:
+
+    ```bash
+    brew install sfml asio
+    ```
+
+3.  Build the project:
+
+    ```bash
+    make
+    ```
+
+### Linux
+
+1.  Install the required libraries using your package manager. For example, on Debian/Ubuntu:
+
+    ```bash
+    sudo apt-get install libsfml-dev libasio-dev
+    ```
+
+2.  Build the project:
+
+    ```bash
+    make
+    ```
+
+### Windows
+
+Building on Windows has not been tested yet, but it should be possible. You will need to install SFML and Asio and configure the Makefile accordingly.
 
 ## Usage
 
