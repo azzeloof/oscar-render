@@ -17,10 +17,8 @@ jobs:
       run: git submodule update --init
     - name: install deps
       run: sudo apt-get install libsfml-dev libasio-dev
-    - name: cd
-      run: cd src
     - name: make
-      run: make
+      run: cd src && make
 #    - name: make check
 #      run: make check
 #    - name: make distcheck
