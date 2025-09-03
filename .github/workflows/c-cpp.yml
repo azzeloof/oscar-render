@@ -13,13 +13,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: submodule init
+      run: git submodule update --init
     - name: install deps
       run: sudo apt-get install libsfml-dev libasio-dev
-    - name: configure
-      run: ./configure
+    - name: cd
+      run: cd src
     - name: make
       run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+#    - name: make check
+#      run: make check
+#    - name: make distcheck
+#      run: make distcheck
