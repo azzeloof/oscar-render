@@ -8,7 +8,7 @@ Below is some sparse documentation to help you get started with OSCAR.
 ## Features
 - Four channels (easy to extend it to add more)
 - OSC interface to control rendering parameters (color, thickness, etc) for each channel
-- Cross-platform architecture (although it has only actually been built on Linux so far)
+- Cross-platform architecture (although it hasn't been built for windows yet)
 
 ## Building
 
