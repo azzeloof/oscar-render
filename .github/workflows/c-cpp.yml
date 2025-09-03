@@ -17,7 +17,7 @@ jobs:
       run: git submodule update --init
 
     - name: Install SFML dependencies
-      run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libfreetype6-dev libglew-dev libjpeg-dev libsndfile1-dev libopenal-dev libudev-dev libx11-xcb-dev
+      run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libfreetype6-dev libglew-dev libjpeg-dev libsndfile1-dev libopenal-dev libudev-dev libx11-xcb-dev libxcb-image0-dev
 
     - name: Build SFML from source
       run: |
