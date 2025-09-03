@@ -46,7 +46,7 @@ Below is some sparse documentation to help you get started with OSCAR.
 
 ### Windows
 
-Building on Windows has not been tested yet, but it should be possible. You will need to install SFML and Asio and configure the Makefile accordingly.
+Building on Windows has not been tested yet, but it should be possible. If you get this working please open a PR.
 
 ## Usage
 
