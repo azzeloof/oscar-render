@@ -3,6 +3,8 @@
 
 This is the rendering component of the OSCAR live coding environment, designed for live performances with oscilloscope visuals. It emulates a four-channel oscilloscope, where each channel takes in a left and right audio input and plots it on an XY plane.
 
+This may be used standalone to visualize any audio signals, or in concert with the [OSCAR Language](https://github.com/azzeloof/oscar-language) and [VSCode Plugin](https://github.com/azzeloof/oscar-vscode) to form a complete live coding environment.
+
 Below is some sparse documentation to help you get started with OSCAR.
 
 ## Features
