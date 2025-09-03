@@ -14,6 +14,15 @@ CPPFLAGS = \
 # Linker flags
 LDFLAGS =
 
+# --- Apple Silicon Mac-specific SFML paths ---
+ifeq ($(shell uname -s), Darwin)
+	ifeq ($(shell uname -m), arm64)
+		CPPFLAGS += -I/opt/homebrew/opt/sfml/include
+		CPPFLAGS += -I/opt/homebrew/opt/asio/include
+		LDFLAGS += -L/opt/homebrew/opt/sfml/lib
+	endif
+endif
+
 # SFML libraries
 SFML_LIBS = -lsfml-graphics -lsfml-window -lsfml-audio -lsfml-system
 
@@ -51,12 +60,13 @@ $(info OSCPACK_IP_SYSTEM_PATH set to: [$(OSCPACK_IP_SYSTEM_PATH)])
 $(info --- End OSCPACK Platform Detection ---)
 
 OSCPACK_SRCS = \
-	$(OSCPACK_DIR)/ip/IpEndpointName.cpp \
-	$(OSCPACK_IP_SYSTEM_PATH)/NetworkingUtils.cpp \
-	$(OSCPACK_IP_SYSTEM_PATH)/UdpSocket.cpp \
-	$(OSCPACK_DIR)/osc/OscOutboundPacketStream.cpp \
-	$(OSCPACK_DIR)/osc/OscReceivedElements.cpp \
-	$(OSCPACK_DIR)/osc/OscPrintReceivedElements.cpp 
+		$(OSCPACK_DIR)/ip/IpEndpointName.cpp \
+		$(OSCPACK_IP_SYSTEM_PATH)/NetworkingUtils.cpp \
+		$(OSCPACK_IP_SYSTEM_PATH)/UdpSocket.cpp \
+		$(OSCPACK_DIR)/osc/OscOutboundPacketStream.cpp \
+		$(OSCPACK_DIR)/osc/OscReceivedElements.cpp \
+		$(OSCPACK_DIR)/osc/OscPrintReceivedElements.cpp \
+		$(OSCPACK_DIR)/osc/OscTypes.cpp 
 # Note: Check if OscHostEndianness.cpp is also platform-specific from CMakeLists.txt if issues persist.
 # CMakeLists.txt shows: osc/OscHostEndianness.h, osc/OscHostEndianness.cpp (seems common)
 
