@@ -9,17 +9,26 @@ on:
 jobs:
   build:
 
-    runs-on: arch-latest
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
     - name: submodule init
       run: git submodule update --init
-    - name: install deps
-      run: sudo pacman -Syuu install libsfml-dev libasio-dev
+
+    #- name: Install SFML dependencies
+    #  run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libfreetype6-dev libglew-dev libjpeg-dev libsndfile1-dev libopenal-dev libudev-dev
+
+    - name: Build SFML from source
+      run: |
+        git clone https://github.com/SFML/SFML.git --branch 3.0.1
+        mkdir SFML/build && cd SFML/build
+        cmake ..
+        make -j$(nproc)
+        sudo make install
+
+    - name: install asio
+      run: sudo apt-get install libasio-dev
+
     - name: make
       run: cd src && make
-#    - name: make check
-#      run: make check
-#    - name: make distcheck
-#      run: make distcheck
