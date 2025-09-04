@@ -5,13 +5,8 @@ CXX = g++
 CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -O2 -g -MMD -MP
 
 # Include paths
-#CPPFLAGS = \
-#	-I./oscar/src/include \
-#	-I./libs/oscpack \
-#	-I./libs/oscpack/ip \
-#	-I./libs/oscpack/osc
 CPPFLAGS = \
-	-I./include \
+	-I./oscar/src/include \
 	-I./libs/oscpack \
 	-I./libs/oscpack/ip \
 	-I./libs/oscpack/osc
@@ -80,8 +75,7 @@ $(foreach s,$(OSCPACK_SRCS),$(info Source: $(s)))
 $(info --- End OSCPACK_SRCS ---)
 
 # --- Project Source Files ---
-#SRCS = oscar/src/main.cpp oscar/src/oscilloscope.cpp oscar/src/osc.cpp
-SRCS = main.cpp oscilloscope.cpp osc.cpp
+SRCS = oscar/src/main.cpp oscar/src/oscilloscope.cpp oscar/src/osc.cpp
 
 # Combine all source files
 ALL_SRCS = $(SRCS) $(OSCPACK_SRCS)
