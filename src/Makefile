@@ -2,7 +2,11 @@
 CXX = g++
 
 # Compiler flags
-CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -O2 -g -MMD -MP
+# --- ADDED: -Wno-vla-cxx-extension to silence warnings from RtAudio ---
+CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -O2 -g -MMD -MP -Wno-vla-cxx-extension
+
+# Define OS_UNAME once to be used throughout the Makefile
+OS_UNAME := $(shell uname -s)
 
 # Include paths
 # --- CORRECTED: Switched from ALSA to JACK for better PipeWire compatibility ---
@@ -17,12 +21,17 @@ CPPFLAGS = \
 # Linker flags
 LDFLAGS =
 
-# --- Apple Silicon Mac-specific SFML paths ---
-ifeq ($(shell uname -s), Darwin)
+# --- Apple Silicon Mac-specific paths ---
+ifeq ($(OS_UNAME), Darwin)
 	ifeq ($(shell uname -m), arm64)
+		# Add include paths for sfml, asio, and jack
 		CPPFLAGS += -I/opt/homebrew/opt/sfml/include
 		CPPFLAGS += -I/opt/homebrew/opt/asio/include
+		CPPFLAGS += -I/opt/homebrew/opt/jack/include
+
+		# Add library paths for sfml and jack
 		LDFLAGS += -L/opt/homebrew/opt/sfml/lib
+		LDFLAGS += -L/opt/homebrew/opt/jack/lib
 	endif
 endif
 
@@ -30,14 +39,20 @@ endif
 SFML_LIBS = -lsfml-graphics -lsfml-window -lsfml-system
 
 # Other libraries
-# --- CORRECTED: Added the -ljack library for linking ---
-OTHER_LIBS = -lasound -lpthread -ljack
+# --- CORRECTED: Added -ljack and made libraries OS-specific ---
+ifeq ($(OS_UNAME), Darwin)
+    # macOS doesn't have ALSA (-lasound)
+    OTHER_LIBS = -lpthread -ljack
+else
+    # Default to Linux setup
+    OTHER_LIBS = -lasound -lpthread -ljack
+endif
+
 
 # --- OSCPACK INTEGRATION ---
 OSCPACK_DIR = libs/oscpack
 OSCPACK_IP_SYSTEM_PATH_DEFAULT = $(OSCPACK_DIR)/ip/posix
 OSCPACK_IP_SYSTEM_PATH = $(OSCPACK_IP_SYSTEM_PATH_DEFAULT)
-OS_UNAME := $(shell uname -s)
 ifeq ($(OS_UNAME),Darwin)
 	OSCPACK_IP_SYSTEM_PATH = $(OSCPACK_DIR)/ip/posix
 else ifeq ($(OS_UNAME),Linux)
@@ -54,13 +69,15 @@ else
   endif
 endif
 
+# --- FIXED: Added missing OscTypes.cpp to the source list ---
 OSCPACK_SRCS = \
 	$(OSCPACK_DIR)/ip/IpEndpointName.cpp \
 	$(OSCPACK_IP_SYSTEM_PATH)/NetworkingUtils.cpp \
 	$(OSCPACK_IP_SYSTEM_PATH)/UdpSocket.cpp \
 	$(OSCPACK_DIR)/osc/OscOutboundPacketStream.cpp \
 	$(OSCPACK_DIR)/osc/OscReceivedElements.cpp \
-	$(OSCPACK_DIR)/osc/OscPrintReceivedElements.cpp
+	$(OSCPACK_DIR)/osc/OscPrintReceivedElements.cpp \
+	$(OSCPACK_DIR)/osc/OscTypes.cpp
 
 
 # --- RtAudio Source Files ---
@@ -118,3 +135,5 @@ clean:
 
 # Phony targets
 .PHONY: all clean
+
+

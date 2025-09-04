@@ -83,7 +83,7 @@ int main() {
     params.deviceId = audio.getDefaultInputDevice();
     params.nChannels = 8;
     params.firstChannel = 0;
-    unsigned int sampleRate = 48000;
+    unsigned int sampleRate = 44100;
     unsigned int bufferFrames = 256;
 
     // --- FIX: Add StreamOptions to prevent auto-connecting and set a custom name ---
@@ -95,7 +95,7 @@ int main() {
         audio.openStream(NULL, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
         audio.startStream();
         std::cout << "Successfully opened 8-channel JACK input stream." << std::endl;
-        std::cout << "Application should be visible in qpwgraph as '" << options.streamName << "'." << std::endl;
+        std::cout << "Application should be visible in qjackctl or qpwgraph as '" << options.streamName << "'." << std::endl;
     }
     catch (const std::exception& e) {
         std::cerr << "Error opening audio stream: " << e.what() << std::endl;

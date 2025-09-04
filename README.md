@@ -35,7 +35,7 @@ Clone the repo, then run `git submodule update --init` and enter the `src` direc
 2.  Install the required libraries:
 
     ```bash
-    brew install sfml asio
+    brew install sfml asio jack qjackctl
     ```
 
 3.  Build the project:
