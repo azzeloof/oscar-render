@@ -20,11 +20,11 @@ jobs:
       run: |
         sudo apt-get install build-essential procps curl file git
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-        source ~/.bashrc
+        #echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+        #source ~/.bashrc
         
     - name: Install SFML
-      run: brew install sfml
+      run: /home/linuxbrew/.linuxbrew/bin/brew install sfml
 
     #- name: Install SFML dependencies
     #  run: sudo apt install libxrandr-dev libxcursor-dev libxi-dev libudev-dev libfreetype-dev libflac-dev libvorbis-dev libgl1-mesa-dev libegl1-mesa-dev libfreetype-dev
