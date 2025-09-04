@@ -1,3 +1,6 @@
 [submodule "src/libs/oscpack"]
 	path = src/libs/oscpack
 	url = https://github.com/RossBencina/oscpack.git
+[submodule "src/libs/rtaudio"]
+	path = src/libs/rtaudio
+	url = https://github.com/thestk/rtaudio.git
