@@ -9,14 +9,14 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: arch-latest
 
     steps:
     - uses: actions/checkout@v4
     - name: submodule init
       run: git submodule update --init
     - name: install deps
-      run: sudo apt-get install libsfml-dev libasio-dev
+      run: sudo pacman -Syuu install libsfml-dev libasio-dev
     - name: make
       run: cd src && make
 #    - name: make check
