@@ -28,7 +28,7 @@ jobs:
         sudo make install
 
     - name: install asio and jack
-      run: sudo apt-get install libasio-dev jackd
+      run: sudo apt-get install libasio-dev libjack-dev
 
     - name: make
       run: cd src && make
