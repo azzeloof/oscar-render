@@ -17,6 +17,15 @@ CPPFLAGS = \
 # Linker flags
 LDFLAGS =
 
+# --- Apple Silicon Mac-specific SFML paths ---
+ifeq ($(shell uname -s), Darwin)
+	ifeq ($(shell uname -m), arm64)
+		CPPFLAGS += -I/opt/homebrew/opt/sfml/include
+		CPPFLAGS += -I/opt/homebrew/opt/asio/include
+		LDFLAGS += -L/opt/homebrew/opt/sfml/lib
+	endif
+endif
+
 # SFML libraries
 SFML_LIBS = -lsfml-graphics -lsfml-window -lsfml-system
 
@@ -52,6 +61,7 @@ OSCPACK_SRCS = \
 	$(OSCPACK_DIR)/osc/OscOutboundPacketStream.cpp \
 	$(OSCPACK_DIR)/osc/OscReceivedElements.cpp \
 	$(OSCPACK_DIR)/osc/OscPrintReceivedElements.cpp
+
 
 # --- RtAudio Source Files ---
 RTAUDIO_DIR = libs/rtaudio

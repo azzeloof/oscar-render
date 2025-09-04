@@ -3,20 +3,51 @@
 
 This is the rendering component of the OSCAR live coding environment, designed for live performances with oscilloscope visuals. It emulates a four-channel oscilloscope, where each channel takes in a left and right audio input and plots it on an XY plane.
 
+This may be used standalone to visualize any audio signals, or in concert with the [OSCAR Language](https://github.com/azzeloof/oscar-language) and [VSCode Plugin](https://github.com/azzeloof/oscar-vscode) to form a complete live coding environment.
+
 Below is some sparse documentation to help you get started with OSCAR.
 
 ## Features
 - Four channels (easy to extend it to add more)
 - OSC interface to control rendering parameters (color, thickness, etc) for each channel
-- Cross-platform architecture (although it has only actually been built on Linux so far)
+- Cross-platform architecture (although it hasn't been built for windows yet)
 
-## Building (Linux)
-There are already hooks in the Makefile to build for Mac as well, but is untested. Any help in documenting the build process for Mac or Windows would be appreciated!
+## Building
+Clone the repo, then run `git submodule update --init` and enter the `src` directory.
 
-- Clone the repo
-- Install the SFML libraries for your OS
-- Pull the libraries: `git submodule update --init`
-- `cd src && make`
+### Linux
+
+1.  Install the required libraries using your package manager. For example, on Debian/Ubuntu:
+
+    ```bash
+    sudo apt-get install libsfml-dev libasio-dev
+    ```
+
+2.  Build the project:
+
+    ```bash
+    make
+    ```
+
+### macOS (Apple Silicon)
+
+1.  Install Homebrew if you don't have it already.
+2.  Install the required libraries:
+
+    ```bash
+    brew install sfml asio
+    ```
+
+3.  Build the project:
+
+    ```bash
+    make
+    ```
+
+
+### Windows
+
+Building on Windows has not been tested yet, but it should be possible. If you get this working please open a PR.
 
 ## Usage
 

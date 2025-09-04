@@ -1,0 +1,25 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: submodule init
+      run: git submodule update --init
+    - name: install deps
+      run: sudo apt-get install libsfml-dev libasio-dev
+    - name: make
+      run: cd src && make
+#    - name: make check
+#      run: make check
+#    - name: make distcheck
+#      run: make distcheck
