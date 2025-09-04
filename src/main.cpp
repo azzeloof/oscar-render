@@ -83,8 +83,16 @@ int main() {
     params.deviceId = audio.getDefaultInputDevice();
     params.nChannels = 8;
     params.firstChannel = 0;
-    unsigned int sampleRate = 44100;
     unsigned int bufferFrames = 256;
+
+    // Query the default input device for its preferred sample rate
+    RtAudio::DeviceInfo info = audio.getDeviceInfo(params.deviceId);
+    unsigned int sampleRate = info.preferredSampleRate;
+    if (sampleRate == 0) {
+        std::cerr << "Warning: Could not determine preferred sample rate from JACK. Falling back to 44100." << std::endl;
+        sampleRate = 44100; // Fallback
+    }
+    std::cout << "Using sample rate: " << sampleRate << std::endl;
 
     // --- FIX: Add StreamOptions to prevent auto-connecting and set a custom name ---
     RtAudio::StreamOptions options;
