@@ -27,8 +27,8 @@ jobs:
         make -j$(nproc)
         sudo make install
 
-    - name: install asio
-      run: sudo apt-get install libasio-dev
+    - name: install asio and jack
+      run: sudo apt-get install libasio-dev jackd
 
     - name: make
       run: cd src && make
