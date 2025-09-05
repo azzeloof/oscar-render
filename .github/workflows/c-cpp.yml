@@ -17,11 +17,11 @@ jobs:
       run: git submodule update --init
 
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libudev-dev libxrandr-dev libxcursor-dev libxi-dev libfreetype-dev libopenal-dev libflac-dev libvorbis-dev libasound2-dev libjack-dev libasio-dev
+      run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libudev-dev libxrandr-dev libxcursor-dev libxi-dev libfreetype-dev libopenal-dev libflac-dev libvorbis-dev libasound2-dev libjack-dev libasio-dev curl
 
     - name: Download and Install SFML 3.0.1 SDK
       run: |
-        wget https://github.com/SFML/SFML/releases/download/3.0.1/SFML-3.0.1-linux-gcc-x86_64.tar.gz
+        curl -LO https://github.com/SFML/SFML/releases/download/3.0.1/SFML-3.0.1-linux-gcc-x86_64.tar.gz
         tar -zxvf SFML-3.0.1-linux-gcc-x86_64.tar.gz
         sudo cp -r SFML-3.0.1/include/* /usr/local/include/
         sudo cp -r SFML-3.0.1/lib/* /usr/local/lib/
