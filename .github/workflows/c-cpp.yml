@@ -21,7 +21,7 @@ jobs:
 
     - name: Download and Install SFML 3.0.0 SDK
       run: |
-        wget https://www.sfml-dev.org/files/SFML-3.0.0-linux-gcc-64-bit.tar.gz
+        wget --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" https://www.sfml-dev.org/files/SFML-3.0.0-linux-gcc-64-bit.tar.gz
         tar -zxvf SFML-3.0.0-linux-gcc-64-bit.tar.gz
         sudo cp -r SFML-3.0.0/include/* /usr/local/include/
         sudo cp -r SFML-3.0.0/lib/* /usr/local/lib/
