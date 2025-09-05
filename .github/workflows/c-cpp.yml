@@ -28,7 +28,7 @@ jobs:
         sudo make install
         sudo ldconfig
 
-    - name: make
+    - name: Update Makefile and build
       run: |
-        export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+        sed -i 's/^LDFLAGS =/LDFLAGS = -L\/usr\/local\/lib/' src/Makefile
         cd src && make
