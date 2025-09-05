@@ -1,7 +1,7 @@
 # OSCAR (Renderer)
 **OS**cilloscope **C**ode **A**nd **R**enderer
 
-[![C++ Build](https://github.com/azzeloof/oscar-render/actions/workflows/c-cpp.yml/badge.svg](https://github.com/azzeloof/oscar-render/actions/workflows/c-cpp.yml)
+[![C++ Build](https://github.com/azzeloof/oscar-render/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/azzeloof/oscar-render/actions/workflows/c-cpp.yml)
 
 This is the rendering component of the OSCAR live coding environment, designed for live performances with oscilloscope visuals. It emulates a four-channel oscilloscope, where each channel takes in a left and right audio input and plots it on an XY plane.
 
