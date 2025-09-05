@@ -28,7 +28,9 @@ jobs:
         sudo make install
         sudo ldconfig
 
-    - name: Update Makefile and build
+    - name: Link SFML libraries to standard location
       run: |
-        sed -i 's/^LDFLAGS =/LDFLAGS = -L\/usr\/local\/lib\/x86_64-linux-gnu\//' src/Makefile
-        cd src && make
+        sudo ln -s /usr/local/lib/x86_64-linux-gnu/libsfml-*.so /usr/lib/
+
+    - name: make
+      run: cd src && make
