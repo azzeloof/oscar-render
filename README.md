@@ -7,11 +7,13 @@ This may be used standalone to visualize any audio signals, or in concert with t
 
 Below is some sparse documentation to help you get started with OSCAR.
 
+---
 ## Features
 - Four channels (easy to extend it to add more)
 - OSC interface to control rendering parameters (color, thickness, etc) for each channel
 - Cross-platform architecture (although it hasn't been built for windows yet)
 
+---
 ## Building
 Clone the repo, then run `git submodule update --init` and enter the `src` directory.
 
@@ -20,8 +22,11 @@ Clone the repo, then run `git submodule update --init` and enter the `src` direc
 1.  Install the required libraries using your package manager. For example, on Debian/Ubuntu:
 
     ```bash
-    sudo apt-get install libsfml-dev libasio-dev
+    sudo apt-get install libasio-dev libjack-dev
     ```
+    > **⚠️ Important SFML Requirement:** This project requires **SFML 3.0** or newer. Many distributions, including Ubuntu, provide an older version of SFML (2.x) in their default package managers (`libsfml-dev`). Until this is updated, you will need to download the SFML 3.0 SDK manually.
+    >
+    > You can get the latest Linux SDK from the [official SFML download page](https://www.sfml-dev.org/download/sfml/3.0.0/). After downloading and extracting, you will need to copy the `include` and `lib` files to a system directory like `/usr/local/`.
 
 2.  Build the project:
 
@@ -44,11 +49,11 @@ Clone the repo, then run `git submodule update --init` and enter the `src` direc
     make
     ```
 
-
 ### Windows
 
 Building on Windows has not been tested yet, but it should be possible. If you get this working please open a PR.
 
+---
 ## Usage
 
 To launch the program, run `./src/build/oscar_render` and select the audio device you'd like to listen to in the terminal. You can use a virtual audio device (JACK, VB-Cable, etc) to connect the output from another program to the OSCAR input. To change the display parameters, use OSC messages on port 7000:
