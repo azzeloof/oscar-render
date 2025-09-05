@@ -28,14 +28,7 @@ jobs:
         sudo make install
         sudo ldconfig
 
-    - name: Verify SFML installation
-      run: |
-        echo "--- Verifying SFML library installation in /usr/local/lib ---"
-        ls -lR /usr/local/lib/
-
     - name: Update Makefile and build
       run: |
-        sed -i 's/^LDFLAGS =/LDFLAGS = -L\/usr\/local\/lib/' src/Makefile
-        echo "--- Makefile LDFLAGS after modification ---"
-        grep "^LDFLAGS" src/Makefile
+        sed -i 's/^LDFLAGS =/LDFLAGS = -L\/usr\/local\/lib\/x86_64-linux-gnu\//' src/Makefile
         cd src && make
