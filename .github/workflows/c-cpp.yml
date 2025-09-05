@@ -19,14 +19,13 @@ jobs:
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libudev-dev libxrandr-dev libxcursor-dev libxi-dev libfreetype-dev libopenal-dev libflac-dev libvorbis-dev libasound2-dev libjack-dev libasio-dev
 
-    - name: Build SFML from source
+    - name: Download and Install SFML 3.0.1 SDK
       run: |
-        git clone https://github.com/SFML/SFML.git --branch 3.0.1
-        mkdir SFML/build && cd SFML/build
-        cmake ..
-        make -j$(nproc)
-        sudo make install
+        wget https://github.com/SFML/SFML/releases/download/3.0.1/SFML-3.0.1-linux-gcc-64-bit.tar.gz
+        tar -zxvf SFML-3.0.1-linux-gcc-64-bit.tar.gz
+        sudo cp -r SFML-3.0.1/include/* /usr/local/include/
+        sudo cp -r SFML-3.0.1/lib/* /usr/local/lib/
         sudo ldconfig
 
     - name: Build Project
-      run: cd src && make LDFLAGS="-L/usr/local/lib/x86_64-linux-gnu/"
+      run: cd src && make
