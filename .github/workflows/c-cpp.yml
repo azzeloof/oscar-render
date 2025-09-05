@@ -16,8 +16,8 @@ jobs:
     - name: submodule init
       run: git submodule update --init
 
-    - name: Install SFML dependencies
-      run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libudev-dev libxrandr-dev libxcursor-dev libxi-dev libfreetype-dev libopenal-dev libflac-dev libvorbis-dev
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libudev-dev libxrandr-dev libxcursor-dev libxi-dev libfreetype-dev libopenal-dev libflac-dev libvorbis-dev libasound2-dev libjack-dev libasio-dev
 
     - name: Build SFML from source
       run: |
@@ -28,8 +28,7 @@ jobs:
         sudo make install
         sudo ldconfig
 
-    - name: install asio and jack
-      run: sudo apt-get install -y libasio-dev libjack-dev
-
     - name: make
-      run: cd src && make
+      run: |
+        export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+        cd src && make
