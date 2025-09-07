@@ -19,7 +19,6 @@
 const std::size_t nScopes = 4;
 std::array<Oscilloscope, nScopes> scopes;
 std::vector<int16_t> audioBuffer;
-// The global mutex was removed, as locking is handled inside each Oscilloscope instance.
 
 // Audio callback function for RtAudio
 int audioCallback(void* /*outputBuffer*/, void* inputBuffer, unsigned int nFrames,
@@ -28,7 +27,6 @@ int audioCallback(void* /*outputBuffer*/, void* inputBuffer, unsigned int nFrame
         std::cerr << "Stream overflow detected!" << std::endl;
     }
 
-    // The lock_guard was removed to prevent blocking the high-priority audio thread.
     const int16_t* input = (const int16_t*)inputBuffer;
 
     for (unsigned int i = 0; i < nScopes; ++i) {
@@ -71,16 +69,50 @@ int main() {
     unsigned int width = 800;
     unsigned int height = 600;
 
-    // --- RtAudio Setup using JACK Backend ---
+    RtAudio::StreamParameters params;
+#ifdef __APPLE__
+    // --- RtAudio Setup for macOS using CoreAudio ---
+    RtAudio audio;
+    if (audio.getDeviceCount() < 1) {
+        std::cerr << "Error: No audio devices found." << std::endl;
+        return -1;
+    }
+
+    // Find the BlackHole audio device
+    unsigned int blackHoleDeviceId = 0;
+    std::vector<unsigned int> deviceIds = audio.getDeviceIds();
+    for (unsigned int i : deviceIds) {
+        try {
+            RtAudio::DeviceInfo info = audio.getDeviceInfo(i);
+            std::cout << "Found device: " << info.name << " with ID: " << i << std::endl;
+            if (std::string(info.name).find("BlackHole") != std::string::npos) {
+                blackHoleDeviceId = i;
+                break;
+            }
+        } catch (const RtAudioErrorType& e) {
+            std::cerr << "Error getting device info for device " << i << ": " << e << std::endl;
+        }
+    }
+
+    if (blackHoleDeviceId == 0) {
+        std::cerr << "Error: BlackHole audio device not found." << std::endl;
+        std::cerr << "Please install BlackHole from https://github.com/ExistentialAudio/BlackHole" << std::endl;
+        return -1;
+    }
+
+    params.deviceId = blackHoleDeviceId;
+#else
+    // --- RtAudio Setup using JACK Backend (for Linux) ---
     RtAudio audio(RtAudio::UNIX_JACK);
     if (audio.getDeviceCount() < 1) {
         std::cerr << "Error: No audio devices found by the JACK backend.\n"
                   << "Please ensure the PipeWire-JACK compatibility layer is running." << std::endl;
         return -1;
     }
-    
-    RtAudio::StreamParameters params;
     params.deviceId = audio.getDefaultInputDevice();
+#endif
+    
+    
     params.nChannels = 8;
     params.firstChannel = 0;
     unsigned int bufferFrames = 256;
@@ -94,7 +126,16 @@ int main() {
     }
     std::cout << "Using sample rate: " << sampleRate << std::endl;
 
-    // --- FIX: Add StreamOptions to prevent auto-connecting and set a custom name ---
+#ifdef __APPLE__
+    // For macOS, use default stream options
+    RtAudio::StreamOptions options;
+    try {
+        audio.openStream(NULL, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
+        audio.startStream();
+        std::cout << "Successfully opened CoreAudio input stream." << std::endl;
+    }
+#else
+    // For Linux, use JACK-specific stream options
     RtAudio::StreamOptions options;
     options.flags = RTAUDIO_JACK_DONT_CONNECT;
     options.streamName = "OSCAR Renderer";
@@ -102,9 +143,10 @@ int main() {
     try {
         audio.openStream(NULL, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
         audio.startStream();
-        std::cout << "Successfully opened 8-channel JACK input stream." << std::endl;
+        std::cout << "Successfully opened JACK input stream." << std::endl;
         std::cout << "Application should be visible in qjackctl or qpwgraph as '" << options.streamName << "'." << std::endl;
     }
+#endif
     catch (const std::exception& e) {
         std::cerr << "Error opening audio stream: " << e.what() << std::endl;
         return -1;

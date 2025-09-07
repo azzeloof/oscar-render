@@ -26,7 +26,7 @@ Clone the repo, then run `git submodule update --init` and enter the `src` direc
     ```bash
     sudo apt-get install libasio-dev libjack-dev
     ```
-    > **⚠️ Important SFML Requirement:** This project requires **SFML 3.0** or newer. Many distributions, including Ubuntu, provide an older version of SFML (2.x) in their default package managers (`libsfml-dev`). Until this is updated, you will need to download the SFML 3.0 SDK manually.
+    > **?????? Important SFML Requirement:** This project requires **SFML 3.0** or newer. Many distributions, including Ubuntu, provide an older version of SFML (2.x) in their default package managers (`libsfml-dev`). Until this is updated, you will need to download the SFML 3.0 SDK manually.
     >
     > You can get the latest Linux SDK from the [official SFML download page](https://www.sfml-dev.org/download/sfml/3.0.0/). After downloading and extracting, you will need to copy the `include` and `lib` files to a system directory like `/usr/local/`.
 
@@ -42,8 +42,9 @@ Clone the repo, then run `git submodule update --init` and enter the `src` direc
 2.  Install the required libraries:
 
     ```bash
-    brew install sfml asio jack qjackctl
+    brew install sfml asio jack qjackctl BlackHole-16ch
     ```
+    You will need to restart after installing BlackHole.
 
 3.  Build the project:
 

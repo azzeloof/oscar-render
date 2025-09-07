@@ -2,51 +2,42 @@
 CXX = g++
 
 # Compiler flags
-# --- ADDED: -Wno-vla-cxx-extension to silence warnings from RtAudio ---
 CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -O2 -g -MMD -MP -Wno-vla-cxx-extension
 
 # Define OS_UNAME once to be used throughout the Makefile
 OS_UNAME := $(shell uname -s)
 
 # Include paths
-# --- CORRECTED: Switched from ALSA to JACK for better PipeWire compatibility ---
 CPPFLAGS = \
 	-I./oscar/src/include \
 	-I./libs/oscpack \
 	-I./libs/oscpack/ip \
 	-I./libs/oscpack/osc \
-	-I./libs/rtaudio \
-	-D__UNIX_JACK__
+	-I./libs/rtaudio
 
 # Linker flags
-LDFLAGS =
+LDFLAGS = 
 
-# --- Apple Silicon Mac-specific paths ---
+# OS-specific settings
 ifeq ($(OS_UNAME), Darwin)
-	ifeq ($(shell uname -m), arm64)
-		# Add include paths for sfml, asio, and jack
-		CPPFLAGS += -I/opt/homebrew/opt/sfml/include
-		CPPFLAGS += -I/opt/homebrew/opt/asio/include
-		CPPFLAGS += -I/opt/homebrew/opt/jack/include
-
-		# Add library paths for sfml and jack
-		LDFLAGS += -L/opt/homebrew/opt/sfml/lib
-		LDFLAGS += -L/opt/homebrew/opt/jack/lib
-	endif
+    # macOS settings
+    CPPFLAGS += -D__MACOSX_CORE__
+    OTHER_LIBS = -lpthread -framework CoreAudio -framework CoreFoundation
+    ifeq ($(shell uname -m), arm64)
+        # Apple Silicon Mac-specific paths
+        CPPFLAGS += -I/opt/homebrew/opt/sfml/include
+        CPPFLAGS += -I/opt/homebrew/opt/asio/include
+        LDFLAGS += -L/opt/homebrew/opt/sfml/lib
+    endif
+else
+    # Default to Linux setup
+    CPPFLAGS += -D__UNIX_JACK__
+    OTHER_LIBS = -lasound -lpthread -ljack
 endif
 
 # SFML libraries
 SFML_LIBS = -lsfml-graphics -lsfml-window -lsfml-system
 
-# Other libraries
-# --- CORRECTED: Added -ljack and made libraries OS-specific ---
-ifeq ($(OS_UNAME), Darwin)
-    # macOS doesn't have ALSA (-lasound)
-    OTHER_LIBS = -lpthread -ljack
-else
-    # Default to Linux setup
-    OTHER_LIBS = -lasound -lpthread -ljack
-endif
 
 
 # --- OSCPACK INTEGRATION ---
@@ -85,7 +76,7 @@ RTAUDIO_DIR = libs/rtaudio
 RTAUDIO_SRCS = $(wildcard $(RTAUDIO_DIR)/*.cpp)
 
 # --- Project Source Files ---
-SRCS = oscar/src/main.cpp oscar/src/oscilloscope.cpp oscar/src/osc.cpp
+SRCS = main.cpp oscilloscope.cpp osc.cpp
 
 # Combine all source files
 ALL_SRCS = $(SRCS) $(OSCPACK_SRCS) $(RTAUDIO_SRCS)
