@@ -37,10 +37,8 @@ jobs:
 
     - name: Manual Install SFML
       run: |
-        # Copy headers from the source directory to /usr/local/include/
         sudo cp -r SFML/include/* /usr/local/include/
-        # Copy compiled libraries from the build directory to /usr/local/lib/
-        sudo cp -r SFML/build/lib/* /usr/local/lib/
+        sudo cp -r SFML/lib/* /usr/local/lib/
         sudo ldconfig
 
     - name: Build Project
