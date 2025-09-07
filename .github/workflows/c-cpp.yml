@@ -38,8 +38,18 @@ jobs:
     - name: Manual Install SFML
       run: |
         sudo cp -r SFML/include/* /usr/local/include/
-        sudo cp -r SFML/lib/* /usr/local/lib/
+        sudo cp -r SFML/buildlib/* /usr/local/lib/
         sudo ldconfig
+        echo "Contents of SFML/include"
+        ls SFML/include
+        echo "Contents of use/local/include"
+        ls usr/local/include
+        echo "Contents of SFML/build/lib"
+        ls SFML/build/lib
+        echo "Contents of use/local/lib"
+        ls usr/local/lib
+        
+        
 
     - name: Build Project
       run: cd src && make
