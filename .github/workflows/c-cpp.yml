@@ -32,28 +32,18 @@ jobs:
         git clone https://github.com/SFML/SFML.git --branch 3.0.1
         cd SFML
         mkdir build && cd build
-        cmake ..
+        # Add -DBUILD_SHARED_LIBS=ON to force creation of dynamic libraries (.so files)
+        cmake .. -DBUILD_SHARED_LIBS=ON
         make -j$(nproc)
 
     - name: Manual Install SFML
       run: |
+        # Copy headers from the source directory to /usr/local/include/
         sudo cp -r SFML/include/* /usr/local/include/
+        # Copy compiled libraries from the build directory to /usr/local/lib/
+        # The SFML/build/lib/ directory should now contain the required .so files.
         sudo cp -r SFML/build/lib/* /usr/local/lib/
         sudo ldconfig
-        echo "Contents of SFML"
-        ls SFML
-        echo "Contents of SFML/build"
-        ls SFML/build
-        echo "Contents of SFML/include"
-        ls SFML/include
-        echo "Contents of /usr/local/include"
-        ls /usr/local/include
-        echo "Contents of SFML/build/lib"
-        ls SFML/build/lib
-        echo "Contents of /usr/local/lib"
-        ls /usr/local/lib
-        
-        
 
     - name: Build Project
       run: cd src && make
