@@ -27,19 +27,21 @@ jobs:
     #    sudo cp -r SFML-3.0.0/lib/* /usr/local/lib/
     #    sudo ldconfig
 
-    - name: Build and install SFML
+    - name: Build SFML from source
       run: |
-        git clone https://github.com/SFML/SFML.git
+        git clone https://github.com/SFML/SFML.git --branch 3.0.1
         cd SFML
-        git checkout 3.0.1
-        mkdir build
-        cd build
+        mkdir build && cd build
         cmake ..
-        make
-        ls ../
-        ls
-        sudo cp -r ../include/* /usr/local/include/
-        sudo cp -r ../lib/* /usr/local/lib/
+        make -j$(nproc)
+
+    - name: Manual Install SFML
+      run: |
+        # Copy headers from the source directory to /usr/local/include/
+        sudo cp -r SFML/include/* /usr/local/include/
+        # Copy compiled libraries from the build directory to /usr/local/lib/
+        sudo cp -r SFML/build/lib/* /usr/local/lib/
+        sudo ldconfig
 
     - name: Build Project
       run: cd src && make
