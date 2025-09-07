@@ -46,12 +46,12 @@ jobs:
         ls SFML/build
         echo "Contents of SFML/include"
         ls SFML/include
-        echo "Contents of use/local/include"
-        ls usr/local/include
+        echo "Contents of /usr/local/include"
+        ls /usr/local/include
         echo "Contents of SFML/build/lib"
         ls SFML/build/lib
-        echo "Contents of use/local/lib"
-        ls usr/local/lib
+        echo "Contents of /usr/local/lib"
+        ls /usr/local/lib
         
         
 
