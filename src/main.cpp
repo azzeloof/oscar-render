@@ -3,31 +3,24 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <mutex>
-#include <cstdint>
-#include <algorithm>
-#include <cmath>
-#include <deque>
-#include <numbers>
 #include <thread>
-#include <stdexcept>
 
 #include "include/oscilloscope.hpp"
 #include "include/osc.hpp"
 #include "RtAudio.h"
 
-const std::size_t nScopes = 4;
+constexpr size_t nScopes = 4;
 std::array<Oscilloscope, nScopes> scopes;
 std::vector<int16_t> audioBuffer;
 
 // Audio callback function for RtAudio
-int audioCallback(void* /*outputBuffer*/, void* inputBuffer, unsigned int nFrames,
+int audioCallback(void* /*outputBuffer*/, const void* inputBuffer, const unsigned int nFrames,
     double /*streamTime*/, RtAudioStreamStatus status, void* /*userData*/) {
     if (status) {
         std::cerr << "Stream overflow detected!" << std::endl;
     }
 
-    const int16_t* input = (const int16_t*)inputBuffer;
+    const auto* input = (const int16_t*)inputBuffer;
 
     for (unsigned int i = 0; i < nScopes; ++i) {
         // This temporary buffer is fine, as it's local to the audio thread.
@@ -130,7 +123,7 @@ int main() {
     // For macOS, use default stream options
     RtAudio::StreamOptions options;
     try {
-        audio.openStream(NULL, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
+        audio.openStream(nullptr, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, nullptr, &options);
         audio.startStream();
         std::cout << "Successfully opened CoreAudio input stream." << std::endl;
     }
@@ -182,8 +175,6 @@ int main() {
             if (const auto* resized = event->getIf<sf::Event::Resized>()) {
                 sf::Vector2u sizeVec = {resized->size.x, resized->size.y};
                 sf::FloatRect viewRect({0.f, 0.f}, {static_cast<float>(sizeVec.x), static_cast<float>(sizeVec.y)});
-                width = sizeVec.x;
-                height = sizeVec.y;
                 window.setView(sf::View(viewRect));
                 traceTexture = sf::RenderTexture(sizeVec);
                 blurTexture = sf::RenderTexture(sizeVec);

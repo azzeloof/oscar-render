@@ -28,7 +28,7 @@ public:
     std::optional<float> getPendingBlurSpread();
     std::optional<unsigned int> getPendingAlphaScale();
     std::optional<float> getPendingScale();
-    int getIndex();
+    int getIndex() const;
 
 protected:
     virtual void ProcessMessage(const osc::ReceivedMessage& m, const IpEndpointName& remoteEndpoint) override;
@@ -58,7 +58,7 @@ private:
     void handleReceive(const asio::error_code& error, std::size_t bytes_recvd);
     asio::ip::udp::socket socket_;
     asio::ip::udp::endpoint remote_endpoint_asio_;
-    std::array<char, MAX_OSC_BUFFER_SIZE_ASIO> recv_buffer_;
+    std::array<char, MAX_OSC_BUFFER_SIZE_ASIO> recv_buffer_{};
     OSCListener& listener_;
     bool stopped_ = false;
 };

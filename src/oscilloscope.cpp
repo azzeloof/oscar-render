@@ -1,16 +1,15 @@
 #include "include/oscilloscope.hpp"
 
-
 sf::Vector2f normalize(const sf::Vector2f& source) {
     float length = std::hypot(source.x, source.y);
     if (length != 0)
-        return sf::Vector2f(source.x / length, source.y / length);
+        return {source.x / length, source.y / length};
     else
-        return sf::Vector2f(0.f, 0.f);
+        return {0.f, 0.f};
 }
 
 sf::Vector2f perpendicular(const sf::Vector2f& source) {
-    return sf::Vector2f(-source.y, source.x);
+    return {-source.y, source.x};
 }
 
 float distance(const sf::Vector2f& p1, const sf::Vector2f& p2) {
@@ -18,6 +17,7 @@ float distance(const sf::Vector2f& p1, const sf::Vector2f& p2) {
 }
 
 float distance(float x1, float y1, float x2, float y2) {
+    return std::hypot(x1 - x2, y1 - y2);
     return std::hypot(x1 - x2, y1 - y2);
 }
 

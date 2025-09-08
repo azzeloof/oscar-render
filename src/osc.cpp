@@ -1,8 +1,8 @@
 #include "include/osc.hpp"
 #include <cstring>
 
-OSCListener::OSCListener() {}
-OSCListener::~OSCListener() {}
+OSCListener::OSCListener() = default;
+OSCListener::~OSCListener() = default;
 
 void OSCListener::ProcessMessage(const osc::ReceivedMessage& m, const IpEndpointName& remoteEndpoint) {
     (void) remoteEndpoint; // Mark as unused if not needed
@@ -156,7 +156,7 @@ std::optional<float> OSCListener::getPendingScale() {
     return val;
 }
 
-int::OSCListener::getIndex() {
+int::OSCListener::getIndex() const {
     return rcv_index;
 }
 
