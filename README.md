@@ -9,6 +9,8 @@ This may be used standalone to visualize any audio signals, or in concert with t
 
 Below is some sparse documentation to help you get started with OSCAR.
 
+![](assets/oscar-ss.png)
+
 ---
 ## Features
 - Four channels (easy to extend it to add more)
