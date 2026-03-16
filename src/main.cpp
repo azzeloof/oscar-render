@@ -1,13 +1,19 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
 #include <iostream>
+#include <optional>
 #include <vector>
 #include <string>
 #include <thread>
 
+#include "include/blur_frag.hpp"
 #include "include/oscilloscope.hpp"
 #include "include/osc.hpp"
 #include "RtAudio.h"
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <jack/jack.h>
+#endif
 
 constexpr size_t nScopes = 4;
 std::array<Oscilloscope, nScopes> scopes;
@@ -38,8 +44,30 @@ int audioCallback(void* /*outputBuffer*/, const void* inputBuffer, const unsigne
 }
 
 
-int main() {
+int main(int argc, char** argv) {
+    float framerate = 60.f;
+    bool headless = false;
+
+    for (int i=1; i<argc; ++i) {
+        if (std::string(argv[i]) == "--headless") {
+            headless = true;
+        }
+    }
+
     asio::io_context io_context;
+
+    // Setup TCP Video Feed Socket
+    asio::ip::tcp::socket tcp_socket(io_context);
+    bool tcp_connected = false;
+    try {
+        asio::ip::tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), 5557);
+        tcp_socket.connect(endpoint);
+        tcp_connected = true;
+        std::cout << "Connected to IDE video feed on port 5557." << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "Could not connect to IDE video feed (is the IDE running?)" << std::endl;
+    }
+
     OSCListener osc_listener_handler;
 
     std::unique_ptr<AsioOscReceiver> osc_receiver;
@@ -104,8 +132,8 @@ int main() {
     }
     params.deviceId = audio.getDefaultInputDevice();
 #endif
-    
-    
+
+
     params.nChannels = 8;
     params.firstChannel = 0;
     unsigned int bufferFrames = 256;
@@ -144,47 +172,67 @@ int main() {
         std::cerr << "Error opening audio stream: " << e.what() << std::endl;
         return -1;
     }
-    
+
     // --- SFML 3 API Setup ---
     sf::ContextSettings ctx;
-    sf::RenderWindow window(sf::VideoMode({width, height}), "OSCAR", sf::State::Windowed, ctx);
-    window.setFramerateLimit(60);
+    std::optional<sf::RenderWindow> window;
+    if (!headless) {
+        window.emplace(sf::VideoMode({width, height}), "OSCAR", sf::State::Windowed, ctx);
+        window->setFramerateLimit(static_cast<int>(framerate));
+    }
+
     for (unsigned int i=0; i<nScopes; i++) {
-        scopes[i].updateView(window.getSize());
+        sf::Vector2u viewSize = headless ? sf::Vector2u{width, height} : window->getSize();
+        scopes[i].updateView(viewSize);
     }
 
     sf::RenderTexture traceTexture({width, height});
     sf::RenderTexture compositeTexture({width, height});
     sf::RenderTexture blurTexture({width, height});
     sf::RenderTexture frameTexture({width, height});
+    sf::RenderTexture finalOutputTexture({width, height});
 
     sf::Shader gaussianBlurShader;
-    if (!gaussianBlurShader.loadFromFile("blur.frag", sf::Shader::Type::Fragment)) {
+    if (!gaussianBlurShader.loadFromMemory(BLUR_FRAG_SRC, sf::Shader::Type::Fragment)) {
         std::cerr << "Error: Could not load blur.frag shader." << std::endl;
         return -1;
     }
     gaussianBlurShader.setUniform("texture", sf::Shader::CurrentTexture);
 
-    while (window.isOpen()) {
-        // SFML 3 Event Loop
-        while (const auto event = window.pollEvent()) {
-            if (event->is<sf::Event::Closed>()) {
-                window.close();
-            }
+    sf::Clock frameClock;
+    sf::Time frameTime = sf::seconds(1.f / framerate);
 
-            if (const auto* resized = event->getIf<sf::Event::Resized>()) {
-                sf::Vector2u sizeVec = {resized->size.x, resized->size.y};
-                sf::FloatRect viewRect({0.f, 0.f}, {static_cast<float>(sizeVec.x), static_cast<float>(sizeVec.y)});
-                window.setView(sf::View(viewRect));
-                traceTexture = sf::RenderTexture(sizeVec);
-                blurTexture = sf::RenderTexture(sizeVec);
-                frameTexture = sf::RenderTexture(sizeVec);
-                compositeTexture = sf::RenderTexture(sizeVec);
-                for (unsigned int i=0; i<nScopes; i++) {
-                    scopes[i].updateView(sizeVec);
+    while (window->isOpen()) {
+        if (!headless && window) {
+            // SFML 3 Event Loop
+            while (const auto event = window->pollEvent()) {
+                if (event->is<sf::Event::Closed>()) {
+                    window->close();
+                }
+
+                if (const auto* resized = event->getIf<sf::Event::Resized>()) {
+                    sf::Vector2u sizeVec = {resized->size.x, resized->size.y};
+                    sf::FloatRect viewRect({0.f, 0.f}, {static_cast<float>(sizeVec.x), static_cast<float>(sizeVec.y)});
+                    window->setView(sf::View(viewRect));
+                    traceTexture = sf::RenderTexture(sizeVec);
+                    blurTexture = sf::RenderTexture(sizeVec);
+                    frameTexture = sf::RenderTexture(sizeVec);
+                    compositeTexture = sf::RenderTexture(sizeVec);
+                    finalOutputTexture = sf::RenderTexture(sizeVec);
+                    for (unsigned int i=0; i<nScopes; i++) {
+                        scopes[i].updateView(sizeVec);
+                    }
                 }
             }
+        } else {
+            // Manage framerate manually if we don't have window->setFramerateLimit
+            sf::Time elapsed = frameClock.getElapsedTime();
+            if (elapsed < frameTime) {
+                sf::sleep(frameTime - elapsed);
+            }
+            frameClock.restart();
         }
+
         int scope_index = osc_listener_handler.getIndex();
 
         if (auto val_opt = osc_listener_handler.getPendingTraceThickness()) {
@@ -241,7 +289,9 @@ int main() {
             }
         }
 
-        window.clear(sf::Color::Transparent);
+        window->clear(sf::Color::Transparent);
+
+        finalOutputTexture.clear(sf::Color::Transparent);
 
         for (unsigned int i=0; i<nScopes; i++) {
 
@@ -265,10 +315,61 @@ int main() {
             frameTexture.clear(sf::Color::Transparent);
             frameTexture.draw(sf::Sprite(blurTexture.getTexture()), &gaussianBlurShader);
             frameTexture.display();
-
-            window.draw(sf::Sprite(frameTexture.getTexture()));
+            finalOutputTexture.draw(sf::Sprite(frameTexture.getTexture()));
         }
-        window.display();
+        finalOutputTexture.display();
+
+        if (!headless) {
+            window->clear(sf::Color::Transparent);
+            window->draw(sf::Sprite(finalOutputTexture.getTexture()));
+            window->display();
+        }
+
+        // --- TCP Video Streaming (Targeting ~30fps to save CPU) ---
+        static int frameCounter = 0;
+        frameCounter++;
+        if (!tcp_connected) {
+            // Auto-reconnect: Try to connect once per second
+            if (frameCounter % static_cast<int>(framerate) == 0) {
+                try {
+                    tcp_socket.close(); // Reset socket state
+                    asio::ip::tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), 5557);
+                    tcp_socket.connect(endpoint);
+                    tcp_connected = true;
+                    std::cout << "Connected to IDE video feed." << std::endl;
+                } catch (...) {
+                    // IDE not running yet, fail silently and try again later
+                }
+            }
+        } else if (frameCounter % 2 == 0) {
+            sf::Image img = finalOutputTexture.getTexture().copyToImage();
+
+            // SFML 3 new API returns the optional vector directly
+            std::optional<std::vector<uint8_t>> bufferOpt = img.saveToMemory("jpg");
+
+            if (bufferOpt) {
+                const std::vector<uint8_t>& buffer = *bufferOpt;
+                uint32_t size = buffer.size();
+                std::array<uint8_t, 4> header = {
+                    static_cast<uint8_t>((size >> 24) & 0xFF),
+                    static_cast<uint8_t>((size >> 16) & 0xFF),
+                    static_cast<uint8_t>((size >> 8) & 0xFF),
+                    static_cast<uint8_t>(size & 0xFF)
+                };
+
+                asio::error_code ec;
+                // Send framing header, then payload
+                asio::write(tcp_socket, asio::buffer(header), ec);
+                if (!ec) {
+                    asio::write(tcp_socket, asio::buffer(buffer), ec);
+                }
+
+                if (ec) {
+                    std::cerr << "TCP send error, dropping feed: " << ec.message() << std::endl;
+                    tcp_connected = false;
+                }
+            }
+        }
     }
 
     std::cout << "Stopping OSC receiver and Asio context..." << std::endl;
