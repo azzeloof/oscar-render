@@ -29,6 +29,22 @@ ifeq ($(OS_UNAME), Darwin)
         CPPFLAGS += -I/opt/homebrew/opt/asio/include
         LDFLAGS += -L/opt/homebrew/opt/sfml/lib
     endif
+else ifneq (,$(findstring MINGW,$(OS_UNAME)))
+    # Windows (MinGW) settings
+    CPPFLAGS += -D__WINDOWS_WASAPI__
+    OTHER_LIBS = -lws2_32 -lwinmm -lole32 -lpthread -lmfplat -lmfuuid -lksuser -lwmcodecdspuuid
+else ifneq (,$(findstring MSYS,$(OS_UNAME)))
+    # Windows (MSYS2) settings
+    CPPFLAGS += -D__WINDOWS_WASAPI__
+    OTHER_LIBS = -lws2_32 -lwinmm -lole32 -lpthread -lmfplat -lmfuuid -lksuser -lwmcodecdspuuid
+else ifdef COMSPEC
+    # Windows (Command Prompt fallback) settings
+    CPPFLAGS += -D__WINDOWS_WASAPI__
+    OTHER_LIBS = -lws2_32 -lwinmm -lole32 -lpthread -lmfplat -lmfuuid -lksuser -lwmcodecdspuuid
+else ifdef WINDIR
+    # Windows (Command Prompt fallback) settings
+    CPPFLAGS += -D__WINDOWS_WASAPI__
+    OTHER_LIBS = -lws2_32 -lwinmm -lole32 -lpthread -lmfplat -lmfuuid -lksuser -lwmcodecdspuuid
 else
     # Default to Linux setup
     CPPFLAGS += -D__UNIX_JACK__
@@ -126,5 +142,3 @@ clean:
 
 # Phony targets
 .PHONY: all clean
-
-

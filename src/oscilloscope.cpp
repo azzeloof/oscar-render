@@ -91,29 +91,29 @@ unsigned int Oscilloscope::getAlphaScale() const {
 }
 
 
-void Oscilloscope::processSamples(const std::int16_t* samples, std::size_t sampleCount) {
+void Oscilloscope::processSamples(const float* samples, std::size_t sampleCount) {
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // Work entirely in normalized [-1, 1] coordinate space.
-    // Audio samples are already in [-1, 1] after dividing by 32768.
+    // Audio samples are already in [-1, 1].
     // We apply `scale` here so the waveform amplitude is controlled.
 
     sf::Vector2f prev_norm;
     if (m_has_valid_last_point) {
         prev_norm = m_prev_normalized_pos;
     } else if (sampleCount > 0) {
-        float x_sample0 = static_cast<float>(samples[0]) / 32768.f;
-        float y_sample0 = (sampleCount > 1) ? static_cast<float>(samples[1]) / 32768.f : 0.f;
+        float x_sample0 = samples[0];
+        float y_sample0 = (sampleCount > 1) ? samples[1] : 0.f;
         prev_norm = {x_sample0 * scale, y_sample0 * scale};
     } else {
         return;
     }
 
     for (std::size_t i = 0; i < sampleCount; i += 2) {
-        float x_sample = static_cast<float>(samples[i]) / 32768.f;
+        float x_sample = samples[i];
         float y_sample = 0.f;
         if (i + 1 < sampleCount) {
-            y_sample = static_cast<float>(samples[i + 1]) / 32768.f;
+            y_sample = samples[i + 1];
         }
 
         sf::Vector2f current_norm(x_sample * scale, -y_sample * scale);

@@ -20,17 +20,17 @@ std::array<Oscilloscope, nScopes> scopes;
 std::vector<int16_t> audioBuffer;
 
 // Audio callback function for RtAudio
-int audioCallback(void* /*outputBuffer*/, const void* inputBuffer, const unsigned int nFrames,
+int audioCallback(void* /*outputBuffer*/, void* inputBuffer, const unsigned int nFrames,
     double /*streamTime*/, RtAudioStreamStatus status, void* /*userData*/) {
     if (status) {
         std::cerr << "Stream overflow detected!" << std::endl;
     }
 
-    const auto* input = (const int16_t*)inputBuffer;
+    const auto* input = (const float*)inputBuffer;
 
     for (unsigned int i = 0; i < nScopes; ++i) {
         // This temporary buffer is fine, as it's local to the audio thread.
-        std::vector<int16_t> scopeAudioBuffer;
+        std::vector<float> scopeAudioBuffer;
         scopeAudioBuffer.reserve(nFrames * 2);
         for (unsigned int j = 0; j < nFrames; ++j) {
             scopeAudioBuffer.push_back(input[j * 8 + i * 2]);
@@ -122,6 +122,39 @@ int main(int argc, char** argv) {
     }
 
     params.deviceId = blackHoleDeviceId;
+#elif defined(_WIN32)
+    // --- RtAudio Setup for Windows (WASAPI) ---
+    RtAudio audio(RtAudio::WINDOWS_WASAPI);
+    if (audio.getDeviceCount() < 1) {
+        std::cerr << "Error: No audio devices found on this system." << std::endl;
+        return -1;
+    }
+
+    unsigned int targetDeviceId = audio.getDefaultInputDevice(); // Fallback
+    bool foundVirtualCable = false;
+
+    // Iterate through devices to find VB-Cable automatically
+    unsigned int devices = audio.getDeviceCount();
+    for (unsigned int i = 0; i < devices; i++) {
+        RtAudio::DeviceInfo info = audio.getDeviceInfo(i);
+        
+        // Look for "CABLE Output" in the device name
+        if (info.name.find("CABLE Output") != std::string::npos) {
+            targetDeviceId = i;
+            foundVirtualCable = true;
+            std::cout << "Auto-detected Virtual Cable: " << info.name << " (ID: " << i << ")\n";
+            break;
+        }
+    }
+
+    if (!foundVirtualCable) {
+        std::cerr << "\n=== WARNING ===\n";
+        std::cerr << "'CABLE Output' not found. Falling back to default input device.\n";
+        std::cerr << "For proper OSCAR audio routing on Windows, please install VB-Audio Virtual Cable.\n";
+        std::cerr << "===============\n\n";
+    }
+
+    params.deviceId = targetDeviceId;
 #else
     // --- RtAudio Setup using JACK Backend (for Linux) ---
     RtAudio audio(RtAudio::UNIX_JACK);
@@ -151,7 +184,7 @@ int main(int argc, char** argv) {
     // For macOS, use default stream options
     RtAudio::StreamOptions options;
     try {
-        audio.openStream(nullptr, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, nullptr, &options);
+        audio.openStream(nullptr, &params, RTAUDIO_FLOAT32, sampleRate, &bufferFrames, &audioCallback, nullptr, &options);
         audio.startStream();
         std::cout << "Successfully opened CoreAudio input stream." << std::endl;
     }
@@ -162,7 +195,7 @@ int main(int argc, char** argv) {
     options.streamName = "OSCAR Renderer";
 
     try {
-        audio.openStream(NULL, &params, RTAUDIO_SINT16, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
+        audio.openStream(NULL, &params, RTAUDIO_FLOAT32, sampleRate, &bufferFrames, &audioCallback, NULL, &options);
         audio.startStream();
         std::cout << "Successfully opened JACK input stream." << std::endl;
         std::cout << "Application should be visible in qjackctl or qpwgraph as '" << options.streamName << "'." << std::endl;
