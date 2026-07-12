@@ -56,7 +56,26 @@ Clone the repo, then run `git submodule update --init` and enter the `src` direc
 
 ### Windows
 
-Building on Windows has not been tested yet, but it should be possible. If you get this working please open a PR.
+Building on Windows requires MSYS2/MinGW. Ensure you have the `mingw32-make` (or `make`) command available in your PATH. 
+
+1. Install the required MinGW dependencies via MSYS2:
+    ```bash
+    pacman -S mingw-w64-ucrt-x86_64-asio mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-make mingw-w64-ucrt-x86_64-sfml
+    ```
+
+2.  Build the project from the `src` directory:
+
+    ```bash
+    mingw32-make
+    ```
+
+**Windows Audio Setup Requirements (Important):**
+OSCAR relies on an 8-channel audio stream to render all four scopes. You **must** install [VB-Audio Virtual Cable](https://vb-audio.com/Cable/). 
+
+After installing, you must configure the Virtual Cable to support 8 channels, or Windows will silently truncate the signal to stereo:
+1. Open the Windows Sound Control Panel (`mmsys.cpl`).
+2. Go to the **Playback** tab, right-click **CABLE Input**, select **Configure Speakers**, and set it to **7.1 Surround**.
+3. Go to the **Recording** tab, right-click **CABLE Output**, select **Properties**, go to the **Advanced** tab, and set the Default Format to **8 channel, 24 bit, 48000 Hz** (or match your sample rate).
 
 ---
 ## Usage

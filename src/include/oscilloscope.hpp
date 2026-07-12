@@ -38,7 +38,7 @@ public:
      * @param samples Pointer to the array of audio samples.
      * @param sampleCount Number of samples in the array.
      */
-    void processSamples(const std::int16_t* samples, std::size_t sampleCount);
+    void processSamples(const float* samples, std::size_t sampleCount);
 
     /**
      * @brief Sets the trace thickness.
