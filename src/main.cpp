@@ -192,6 +192,14 @@ int main(int argc, char** argv) {
     sf::RenderTexture frameTexture({width, height});
     sf::RenderTexture finalOutputTexture({width, height});
 
+    // --- Fixed-size preview render textures for TCP streaming ---
+    constexpr unsigned int previewSize = 600;
+    sf::RenderTexture previewTraceTexture({previewSize, previewSize});
+    sf::RenderTexture previewBlurTexture({previewSize, previewSize});
+    sf::RenderTexture previewFrameTexture({previewSize, previewSize});
+    sf::RenderTexture previewCompositeTexture({previewSize, previewSize});
+    sf::RenderTexture previewFinalOutputTexture({previewSize, previewSize});
+
     sf::Shader gaussianBlurShader;
     if (!gaussianBlurShader.loadFromMemory(BLUR_FRAG_SRC, sf::Shader::Type::Fragment)) {
         std::cerr << "Error: Could not load blur.frag shader." << std::endl;
@@ -219,9 +227,9 @@ int main(int argc, char** argv) {
                     frameTexture = sf::RenderTexture(sizeVec);
                     compositeTexture = sf::RenderTexture(sizeVec);
                     finalOutputTexture = sf::RenderTexture(sizeVec);
-                    for (unsigned int i=0; i<nScopes; i++) {
+                    /*for (unsigned int i=0; i<nScopes; i++) {
                         scopes[i].updateView(sizeVec);
-                    }
+                    }*/
                 }
             }
         } else {
@@ -293,58 +301,88 @@ int main(int argc, char** argv) {
 
         finalOutputTexture.clear(sf::Color::Transparent);
 
+        // --- Main window render pass (at window resolution) ---
         for (unsigned int i=0; i<nScopes; i++) {
 
-            traceTexture.clear(sf::Color::Transparent);
-            traceTexture.draw(scopes[i]);
-        
-            traceTexture.display();
+        traceTexture.clear(sf::Color::Transparent);
+        traceTexture.draw(scopes[i]);
+    
+        traceTexture.display();
 
-            gaussianBlurShader.setUniform("texture", compositeTexture.getTexture());
-            gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(traceTexture.getSize()));
-            gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
-            gaussianBlurShader.setUniform("blur_spread_px", scopes[i].getBlurSpread());
-            
-            blurTexture.clear(sf::Color::Transparent);
-            blurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
-            blurTexture.display();
+        gaussianBlurShader.setUniform("texture", compositeTexture.getTexture());
+        gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(traceTexture.getSize()));
+        gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
+        gaussianBlurShader.setUniform("blur_spread_px", scopes[i].getBlurSpread());
+    
+        blurTexture.clear(sf::Color::Transparent);
+        blurTexture.draw(sf::Sprite(traceTexture.getTexture()), &gaussianBlurShader);
+        blurTexture.display();
 
-            gaussianBlurShader.setUniform("texture", blurTexture.getTexture());
-            gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(0.f, 1.f));
+        gaussianBlurShader.setUniform("texture", blurTexture.getTexture());
+        gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(0.f, 1.f));
 
-            frameTexture.clear(sf::Color::Transparent);
-            frameTexture.draw(sf::Sprite(blurTexture.getTexture()), &gaussianBlurShader);
-            frameTexture.display();
-            finalOutputTexture.draw(sf::Sprite(frameTexture.getTexture()));
-        }
-        finalOutputTexture.display();
+        frameTexture.clear(sf::Color::Transparent);
+        frameTexture.draw(sf::Sprite(blurTexture.getTexture()), &gaussianBlurShader);
+        frameTexture.display();
+        finalOutputTexture.draw(sf::Sprite(frameTexture.getTexture()));
+    }
+    finalOutputTexture.display();
 
-        if (!headless) {
-            window->clear(sf::Color::Transparent);
-            window->draw(sf::Sprite(finalOutputTexture.getTexture()));
-            window->display();
-        }
+    if (!headless) {
+        window->clear(sf::Color::Transparent);
+        window->draw(sf::Sprite(finalOutputTexture.getTexture()));
+        window->display();
+    }
 
-        // --- TCP Video Streaming (Targeting ~30fps to save CPU) ---
-        static int frameCounter = 0;
-        frameCounter++;
+    // --- TCP Video Streaming ---
+    static int frameCounter = 0;
+    frameCounter++;
+    bool shouldSendFrame = tcp_connected && (frameCounter % 2 == 0);
+
+    if (shouldSendFrame || (!tcp_connected && frameCounter % static_cast<int>(framerate) == 0)) {
         if (!tcp_connected) {
             // Auto-reconnect: Try to connect once per second
-            if (frameCounter % static_cast<int>(framerate) == 0) {
-                try {
-                    tcp_socket.close(); // Reset socket state
-                    asio::ip::tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), 5557);
-                    tcp_socket.connect(endpoint);
-                    tcp_connected = true;
-                    std::cout << "Connected to IDE video feed." << std::endl;
-                } catch (...) {
-                    // IDE not running yet, fail silently and try again later
-                }
+            try {
+                tcp_socket.close();
+                asio::ip::tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), 5557);
+                tcp_socket.connect(endpoint);
+                tcp_connected = true;
+                std::cout << "Connected to IDE video feed." << std::endl;
+                shouldSendFrame = (frameCounter % 2 == 0);
+            } catch (...) {
+                // IDE not running yet, fail silently and try again later
             }
-        } else if (frameCounter % 2 == 0) {
-            sf::Image img = finalOutputTexture.getTexture().copyToImage();
+        }
 
-            // SFML 3 new API returns the optional vector directly
+        if (tcp_connected && shouldSendFrame) {
+            // Render at fixed preview size — draw() auto-adapts to the target texture size
+            previewFinalOutputTexture.clear(sf::Color::Transparent);
+
+            for (unsigned int i = 0; i < nScopes; i++) {
+                previewTraceTexture.clear(sf::Color::Transparent);
+                previewTraceTexture.draw(scopes[i]);
+                previewTraceTexture.display();
+
+                gaussianBlurShader.setUniform("texture", previewCompositeTexture.getTexture());
+                gaussianBlurShader.setUniform("texture_size", sf::Glsl::Vec2(previewTraceTexture.getSize()));
+                gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(1.f, 0.f));
+                gaussianBlurShader.setUniform("blur_spread_px", scopes[i].getBlurSpread());
+
+                previewBlurTexture.clear(sf::Color::Transparent);
+                previewBlurTexture.draw(sf::Sprite(previewTraceTexture.getTexture()), &gaussianBlurShader);
+                previewBlurTexture.display();
+
+                gaussianBlurShader.setUniform("texture", previewBlurTexture.getTexture());
+                gaussianBlurShader.setUniform("blur_direction", sf::Glsl::Vec2(0.f, 1.f));
+
+                previewFrameTexture.clear(sf::Color::Transparent);
+                previewFrameTexture.draw(sf::Sprite(previewBlurTexture.getTexture()), &gaussianBlurShader);
+                previewFrameTexture.display();
+                previewFinalOutputTexture.draw(sf::Sprite(previewFrameTexture.getTexture()));
+            }
+            previewFinalOutputTexture.display();
+
+            sf::Image img = previewFinalOutputTexture.getTexture().copyToImage();
             std::optional<std::vector<uint8_t>> bufferOpt = img.saveToMemory("jpg");
 
             if (bufferOpt) {
@@ -358,7 +396,6 @@ int main(int argc, char** argv) {
                 };
 
                 asio::error_code ec;
-                // Send framing header, then payload
                 asio::write(tcp_socket, asio::buffer(header), ec);
                 if (!ec) {
                     asio::write(tcp_socket, asio::buffer(buffer), ec);
@@ -371,7 +408,7 @@ int main(int argc, char** argv) {
             }
         }
     }
-
+}
     std::cout << "Stopping OSC receiver and Asio context..." << std::endl;
     if (osc_receiver) {
         osc_receiver->stop();

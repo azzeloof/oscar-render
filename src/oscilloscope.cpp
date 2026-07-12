@@ -22,18 +22,16 @@ float distance(float x1, float y1, float x2, float y2) {
 }
 
 Oscilloscope::Oscilloscope() : m_has_valid_last_point(false), m_thickness(1.f) {
-    prev_vertex.position = {0.f, 0.f};
-    prev_vertex.color = sf::Color::Transparent;
-} 
+    m_prev_normalized_pos = {0.f, 0.f};
+}
 
-void Oscilloscope::updateView(const sf::Vector2u& newSize) {
-    m_center.x = static_cast<float>(newSize.x) / 2.f;
-    m_center.y = static_cast<float>(newSize.y) / 2.f;
-    m_radius = std::min(static_cast<float>(newSize.x), static_cast<float>(newSize.y)) / 2.0f;
+void Oscilloscope::updateView(const sf::Vector2u& /*newSize*/) {
+    // No longer needed — geometry is built in normalized space.
+    // Kept for API compatibility.
 }
 
 void Oscilloscope::setTraceThickness(float thickness) {
-    m_thickness = std::max(thickness, 1.f);;
+    m_thickness = std::max(thickness, 1.f);
 }
 
 float Oscilloscope::getTraceThickness() const {
@@ -50,8 +48,10 @@ sf::Color Oscilloscope::getTraceColor() const {
 
 void Oscilloscope::setPersistenceSamples(unsigned int n) {
     maxPersistentSamples = n;
-    alpha_values.resize(n);
-    center_line_points.resize(n);
+    // Trim if needed
+    while (m_normalized_points.size() > maxPersistentSamples) {
+        m_normalized_points.pop_back();
+    }
 }
 
 unsigned int Oscilloscope::getPersistenceSamples() const {
@@ -93,18 +93,22 @@ unsigned int Oscilloscope::getAlphaScale() const {
 
 void Oscilloscope::processSamples(const std::int16_t* samples, std::size_t sampleCount) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    sf::Vector2f prev_xy;
+
+    // Work entirely in normalized [-1, 1] coordinate space.
+    // Audio samples are already in [-1, 1] after dividing by 32768.
+    // We apply `scale` here so the waveform amplitude is controlled.
+
+    sf::Vector2f prev_norm;
     if (m_has_valid_last_point) {
-        prev_xy = prev_vertex.position;
+        prev_norm = m_prev_normalized_pos;
     } else if (sampleCount > 0) {
         float x_sample0 = static_cast<float>(samples[0]) / 32768.f;
         float y_sample0 = (sampleCount > 1) ? static_cast<float>(samples[1]) / 32768.f : 0.f;
-        prev_xy = {m_center.x + x_sample0 * m_radius * scale,
-                                          m_center.y + y_sample0 * m_radius * scale};
+        prev_norm = {x_sample0 * scale, y_sample0 * scale};
     } else {
-        m_triangle_strip.clear();
         return;
     }
+
     for (std::size_t i = 0; i < sampleCount; i += 2) {
         float x_sample = static_cast<float>(samples[i]) / 32768.f;
         float y_sample = 0.f;
@@ -112,63 +116,85 @@ void Oscilloscope::processSamples(const std::int16_t* samples, std::size_t sampl
             y_sample = static_cast<float>(samples[i + 1]) / 32768.f;
         }
 
-        sf::Vector2f current_screen_pos(m_center.x + x_sample * m_radius * scale,
-                                        m_center.y - y_sample * m_radius * scale);
+        sf::Vector2f current_norm(x_sample * scale, -y_sample * scale);
 
-        float sample_dist = distance(prev_xy, current_screen_pos)/(m_radius*scale);
+        // Distance in normalized space for alpha computation
+        float sample_dist = distance(prev_norm, current_norm);
         uint8_t alpha = static_cast<uint8_t>(255.f - std::min(sample_dist * alpha_scale, 255.f));
 
-        center_line_points.push_front(sf::Vertex(current_screen_pos,sf::Color(trace_color.r, trace_color.g, trace_color.b, alpha)));
-        alpha_values.push_front(alpha);
+        NormalizedPoint pt;
+        pt.pos = current_norm;
+        pt.alpha = alpha;
+        m_normalized_points.push_front(pt);
 
-        if (center_line_points.size() > maxPersistentSamples) {
-            center_line_points.pop_back();
-            alpha_values.pop_back();
+        if (m_normalized_points.size() > maxPersistentSamples) {
+            m_normalized_points.pop_back();
         }
-        prev_xy = current_screen_pos;
+        prev_norm = current_norm;
     }
 
-    if (!center_line_points.empty()) {
-        prev_vertex = center_line_points.front();
+    if (!m_normalized_points.empty()) {
+        m_prev_normalized_pos = m_normalized_points.front().pos;
         m_has_valid_last_point = true;
     } else {
         m_has_valid_last_point = false;
     }
+}
 
-    m_triangle_strip.clear();
-    m_triangle_strip.setPrimitiveType(sf::PrimitiveType::TriangleStrip);
 
-    if (center_line_points.size() < 2) {
-        return;
+sf::VertexArray Oscilloscope::buildTriangleStrip(const sf::Vector2u& targetSize) const {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    sf::VertexArray strip;
+    strip.setPrimitiveType(sf::PrimitiveType::TriangleStrip);
+
+    if (m_normalized_points.size() < 2) {
+        return strip;
     }
 
-    for (std::size_t i = 0; i < center_line_points.size(); i++) {
-        sf::Color oc = center_line_points[i].color;
-        float da = 255.f*static_cast<float>(i)/static_cast<float>(center_line_points.size());
+    // Map normalized [-1, 1] to pixel coordinates for this target
+    float centerX = static_cast<float>(targetSize.x) / 2.f;
+    float centerY = static_cast<float>(targetSize.y) / 2.f;
+    float radius = std::min(centerX, centerY);
+
+    // First pass: compute screen positions and apply persistence fade to alpha
+    struct ScreenPoint {
+        sf::Vector2f pos;
+        sf::Color color;
+    };
+    std::vector<ScreenPoint> screenPoints;
+    screenPoints.reserve(m_normalized_points.size());
+
+    for (std::size_t i = 0; i < m_normalized_points.size(); i++) {
+        const auto& np = m_normalized_points[i];
+
+        sf::Vector2f screenPos(centerX + np.pos.x * radius,
+                               centerY + np.pos.y * radius);
+
+        // Apply persistence fade
+        float da = 255.f * static_cast<float>(i) / static_cast<float>(m_normalized_points.size());
         uint8_t alpha = 0;
-        if (alpha_values[i] >= da) {
-            alpha = alpha_values[i]-static_cast<uint8_t>(da);
+        if (np.alpha >= static_cast<uint8_t>(da)) {
+            alpha = np.alpha - static_cast<uint8_t>(da);
         }
-        center_line_points[i].color = sf::Color(oc.r, oc.g, oc.b, static_cast<uint8_t>(alpha));
+
+        screenPoints.push_back({screenPos, sf::Color(trace_color.r, trace_color.g, trace_color.b, alpha)});
     }
 
-    for (std::size_t i = 0; i < center_line_points.size(); ++i) {
-        const sf::Vertex& P_i = center_line_points[i];
+    // Second pass: build triangle strip with thickness in pixel space
+    for (std::size_t i = 0; i < screenPoints.size(); ++i) {
+        const auto& P_i = screenPoints[i];
         sf::Vector2f normal_vec;
 
         if (i == 0) {
-            const sf::Vertex& P_next = center_line_points[i + 1];
-            sf::Vector2f tangent = normalize(P_next.position - P_i.position);
+            sf::Vector2f tangent = normalize(screenPoints[i + 1].pos - P_i.pos);
             normal_vec = perpendicular(tangent);
-        } else if (i == center_line_points.size() - 1) {
-            const sf::Vertex& P_prev = center_line_points[i - 1];
-            sf::Vector2f tangent = normalize(P_i.position - P_prev.position);
+        } else if (i == screenPoints.size() - 1) {
+            sf::Vector2f tangent = normalize(P_i.pos - screenPoints[i - 1].pos);
             normal_vec = perpendicular(tangent);
         } else {
-            const sf::Vertex& P_prev = center_line_points[i - 1];
-            const sf::Vertex& P_next = center_line_points[i + 1];
-            sf::Vector2f tangent_prev = normalize(P_i.position - P_prev.position);
-            sf::Vector2f tangent_next = normalize(P_next.position - P_i.position);
+            sf::Vector2f tangent_prev = normalize(P_i.pos - screenPoints[i - 1].pos);
+            sf::Vector2f tangent_next = normalize(screenPoints[i + 1].pos - P_i.pos);
             sf::Vector2f n1 = perpendicular(tangent_prev);
             sf::Vector2f n2 = perpendicular(tangent_next);
             normal_vec = normalize(n1 + n2);
@@ -181,18 +207,19 @@ void Oscilloscope::processSamples(const std::int16_t* samples, std::size_t sampl
             normal_vec = sf::Vector2f(0.f, 1.f);
         }
 
-        sf::Vertex v_strip_top(P_i.position + normal_vec * (m_thickness / 2.f), P_i.color);
-        sf::Vertex v_strip_bottom(P_i.position - normal_vec * (m_thickness / 2.f), P_i.color);
-
-        m_triangle_strip.append(v_strip_top);
-        m_triangle_strip.append(v_strip_bottom);
+        // Thickness is always in pixels — same for main window and preview
+        strip.append(sf::Vertex(P_i.pos + normal_vec * (m_thickness / 2.f), P_i.color));
+        strip.append(sf::Vertex(P_i.pos - normal_vec * (m_thickness / 2.f), P_i.color));
     }
+
+    return strip;
 }
 
+
 void Oscilloscope::draw(sf::RenderTarget& target, sf::RenderStates states) const {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_triangle_strip.getVertexCount() == 0) {
+    sf::VertexArray strip = buildTriangleStrip(target.getSize());
+    if (strip.getVertexCount() == 0) {
         return;
     }
-    target.draw(m_triangle_strip, states);
+    target.draw(strip, states);
 }

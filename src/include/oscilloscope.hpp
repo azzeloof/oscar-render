@@ -124,6 +124,15 @@ public:
      */
     unsigned int getAlphaScale() const;
 
+    /**
+     * @brief Builds a triangle strip for the given target size.
+     * The center-line points are stored in normalized [-1,1] space;
+     * this maps them to pixel coordinates for the specified target.
+     * @param targetSize The size of the render target in pixels.
+     * @return A VertexArray ready to draw.
+     */
+    sf::VertexArray buildTriangleStrip(const sf::Vector2u& targetSize) const;
+
 private:
     /**
      * @brief Called by SFML to draw the oscilloscope to a render target.
@@ -132,14 +141,15 @@ private:
      */
     virtual void draw(sf::RenderTarget& target, sf::RenderStates states) const override;
 
-    float m_radius = 0.f;
-    sf::Vector2f m_center;
     mutable std::mutex m_mutex;
 
-    sf::Vertex prev_vertex;
-    sf::VertexArray m_triangle_strip;
-    std::deque<sf::Vertex> center_line_points;
-    std::deque<uint8_t> alpha_values;
+    // Normalized center-line data (positions in [-1, 1] range)
+    struct NormalizedPoint {
+        sf::Vector2f pos;   // normalized position [-1, 1]
+        uint8_t alpha;      // computed alpha
+    };
+    std::deque<NormalizedPoint> m_normalized_points;
+    sf::Vector2f m_prev_normalized_pos;
     bool m_has_valid_last_point;
 
     // Parameters
